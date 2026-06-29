@@ -527,15 +527,14 @@ def remove_profile_inplace(ar, template, phs, nthreads=1):
 
 
 def zero_weight_subint(ar, isub):
-    subint = ar.get_Integration(int(isub))
+    subint = ar.get_Integration(int(np.asarray(isub).item()))
     subint.uniform_weight(0.0)
 
-
 def zero_weight_chan(ar, ichan):
+    ichan = int(np.asarray(ichan).item())
     for isub in range(ar.get_nsubint()):
         subint = ar.get_Integration(int(isub))
-        subint.set_weight(int(ichan), 0.0)
-
+        subint.set_weight(ichan, 0.0)
 
 def clean_hot_bins(ar, thresh=2.0):
     subintdata = get_subints(ar, remove_prof=True)
