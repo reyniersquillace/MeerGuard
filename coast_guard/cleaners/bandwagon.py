@@ -35,11 +35,11 @@ class BandwagonCleaner(cleaners.BaseCleaner):
         sub_badfrac = 1-weights.sum(axis=1)/float(nchan-nchan_masked)
         chan_badfrac = 1-weights.sum(axis=0)/float(nsub-nsub_masked)
 
-        sub_is_bad = np.argwhere(sub_badfrac>self.configs.badchantol)
+        sub_is_bad = np.flatnonzero(sub_badfrac>self.configs.badchantol)
         for isub in sub_is_bad:
             clean_utils.zero_weight_subint(ar, isub)
 
-        chan_is_bad = np.argwhere(chan_badfrac>self.configs.badsubtol)
+        chan_is_bad = np.flatnonzero(chan_badfrac>self.configs.badsubtol)
         for ichan in chan_is_bad:
             clean_utils.zero_weight_chan(ar, ichan)
 
