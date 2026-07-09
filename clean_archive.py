@@ -34,15 +34,15 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 if __name__ == "__main__":
     # Parse some arguments to set up cleaning
     parser = argparse.ArgumentParser(description="Run MeerGuard on input archive file")
-    parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="Path to the archive file")
-    parser.add_argument("-T", "--template", type=str, dest="template_path", help="Path to the 2D template file")
+    parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="REQUIRED: path to the archive file")
+    parser.add_argument("-O", "--outpath", type=str, dest="output_path", help="REQUIRED: output path [default = CWD]", default=os.getcwd())
+    parser.add_argument("-T", "--template", type=str, dest="template_path", help="REQUIRED: path to the 2D template file")
     parser.add_argument("-c", "--chanthresh", type=float, dest="chan_thresh", help="Channel threshold (in sigma) [default = 7.0]", default=7.0)
     parser.add_argument("-s", "--subthresh", type=float, dest="subint_thresh", help="Subint threshold (in sigma) [default = 7.0]", default=7.0)
     parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95]", default=0.95)
     parser.add_argument("-bs", "--badsubtol", type=float, dest="badsubtol", help="Fraction of bad subints threshold (in sigma) [default = 0.95]", default=0.95)
     parser.add_argument("-o", "--outname", type=str, dest="output_name", help="Output archive name", default=None)
     parser.add_argument("-plot", "--plot", dest='plot', action='store_true', default=False)
-    parser.add_argument("-O", "--outpath", type=str, dest="output_path", help="Output path [default = CWD]", default=os.getcwd())
     args = parser.parse_args()
 
 
