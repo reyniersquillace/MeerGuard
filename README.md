@@ -10,3 +10,12 @@ The code can be installed using
 ```
 python setup.py install
 ```
+
+The MeerGuard pipeline needs at least three options to run: the archive file to clean, the output file name, and a 2D template archive file. The routine subtracts the template to avoid zapping bright scintles.
+
+Example usage:
+
+```
+python clean_archive.py -a my_archive_file.rf -t my_template_file.rf -o my_clean_file.mg
+```
+
