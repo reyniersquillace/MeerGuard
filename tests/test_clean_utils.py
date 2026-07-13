@@ -2,8 +2,8 @@
 
 Only the pure-numeric helpers that do not require a live psrchive Archive are
 tested here. Functions that take an ``ar`` (Archive) argument -- e.g.
-``get_chans``, ``get_frequencies``, ``clean_hot_bins``, ``remove_profile_inplace``,
-``write_psrsh_script`` -- need psrchive and are covered by integration tests.
+``get_frequencies``, ``remove_profile_inplace``, ``write_psrsh_script`` -- need
+psrchive and are covered by integration tests.
 """
 import numpy as np
 import numpy.testing as npt
@@ -271,30 +271,3 @@ class TestComprehensiveStats:
                                      aggressive=True)
         # max over diagnostics >= mean over diagnostics, elementwise.
         assert np.all(agg + 1e-9 >= avg)
-
-
-# ---------------------------------------------------------------------------
-# get_hot_bins
-# ---------------------------------------------------------------------------
-class TestGetHotBins:
-    def test_normal_data_below_threshold_returns_empty(self):
-        data = np.random.RandomState(1).normal(size=80)
-        hot, status = cu.get_hot_bins(data, normstat_thresh=1e6)
-        assert status == 0
-        assert len(hot) == 0
-
-    def test_return_types(self):
-        data = np.random.RandomState(5).normal(size=60)
-        hot, status = cu.get_hot_bins(data, normstat_thresh=1e6)
-        assert isinstance(hot, np.ndarray)
-        assert isinstance(status, int)
-
-    @pytest.mark.xfail(reason="get_hot_bins references undefined local 'hot_bins' when "
-                              "max_num_hot is provided -> NameError (suspected code bug)",
-                       raises=NameError, strict=True)
-    def test_max_num_hot_bug(self):
-        data = np.random.RandomState(3).normal(size=80)
-        data[5] = 500.0
-        data[6] = 400.0
-        cu.get_hot_bins(data, normstat_thresh=1.0, max_num_hot=2,
-                        only_decreasing=False)

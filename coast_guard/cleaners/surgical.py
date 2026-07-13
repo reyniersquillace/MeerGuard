@@ -290,7 +290,5 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 # not the clone we've been working with.
                 integ = ar.get_Integration(int(isub))
                 integ.set_weight(int(ichan), 0.0)
-            
-            #freq_fraczap = clean_utils.freq_fraczap(ar)
 
 Cleaner = SurgicalScrubCleaner

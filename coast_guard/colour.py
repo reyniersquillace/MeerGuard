@@ -149,16 +149,6 @@ def cprint(s, *override, **kwoverride):
     print(cstring(s, *override, **kwoverride))
 
 
-def show_dictionary():
-    """Display the dictionary of colour keywords. (Not yet implemented.)"""
-    raise NotImplementedError("colours.show_dictionary needs to be implemented")
-
-
-def show_colours():
-    """Display the available colours. (Not yet implemented.)"""
-    raise NotImplementedError("colours.show_colours needs to be implemented")
-
-
 def show_status():
     """Display status of colours module.
         Print global variables.
@@ -177,31 +167,6 @@ def parse_attributes(option, opt_str, value, parser):
         # Create empty dictionary for text attributes
         setattr(parser.values, 'attributes', {})
     parser.values.attributes[value] = True
-
-
-class ColourizedOutput(object):
-    """A 'file' wrapper class that colourizes its output.
-    """
-    def __init__(self, fileobject, *cargs, **ckwargs):
-        """Wrap a file-like object, colourizing anything written to it.
-
-            Inputs:
-                fileobject: The file-like object to wrap.
-                cargs: Positional colour arguments applied to writes.
-                ckwargs: Keyword colour arguments applied to writes.
-        """
-        self.fileobject = fileobject
-        self.cargs = cargs
-        self.ckwargs = ckwargs
-
-    def __getattr__(self, name):
-        """Delegate attribute access to the wrapped file object."""
-        return getattr(self.fileobject, name)
-
-    def write(self, s):
-        """Write string 's' to the wrapped file object, colourized."""
-        print("Writing")
-        self.fileobject.write(colour.cstring(s), *cargs, **ckwargs)
 
 
 def main():
