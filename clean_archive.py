@@ -75,16 +75,30 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run MeerGuard on input archive file")
     parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="Path to the archive file")
     parser.add_argument("-T", "--template", type=str, dest="template_path", help="Path to the 2D template file")
-    parser.add_argument("-c", "--chanthresh", type=float, dest="chan_thresh", help="Channel threshold (in sigma) [default = 7.0]", default=7.0)
-    parser.add_argument("-s", "--subthresh", type=float, dest="subint_thresh", help="Subint threshold (in sigma) [default = 7.0]", default=7.0)
-    parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95]", default=0.95)
-    parser.add_argument("-bs", "--badsubtol", type=float, dest="badsubtol", help="Fraction of bad subints threshold [default = 0.95]", default=0.95)
+    parser.add_argument("-c", "--chanthresh", type=float, dest="chan_thresh", help="Channel threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
+    parser.add_argument("-s", "--subthresh", type=float, dest="subint_thresh", help="Subint threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
+    parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
+    parser.add_argument("-bs", "--badsubtol", type=float, dest="badsubtol", help="Fraction of bad subints threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
     parser.add_argument("-o", "--outname", type=str, dest="output_name", help="Output archive name", default=None)
     parser.add_argument("-plot", "--plot", dest='plot', action='store_true', default=False)
     parser.add_argument("-O", "--outpath", type=str, dest="output_path", help="Output path [default = CWD]", default=os.getcwd())
     parser.add_argument("-ag", "--aggressive", dest='aggressive', action='store_true', default=False, help="Whether to use more aggressive cleaning thresholds and algorithms")
     parser.add_argument("-i", "--iterations", type=int, dest="iterations", help="Number of iterations to run the surgical cleaner [default = 1]", default=1)
     args = parser.parse_args()
+
+    # Resolve the cleaning thresholds. When --aggressive is given, any
+    # threshold the user did NOT set explicitly on the command line falls
+    # back to the documented aggressive value; otherwise it falls back to the
+    # normal default. Explicit user overrides are preserved either way.
+    if args.aggressive:
+        threshold_defaults = {'chan_thresh': 5.0, 'subint_thresh': 5.0,
+                              'badchantol': 0.8, 'badsubtol': 0.8}
+    else:
+        threshold_defaults = {'chan_thresh': 7.0, 'subint_thresh': 7.0,
+                              'badchantol': 0.95, 'badsubtol': 0.95}
+    for name, default in threshold_defaults.items():
+        if getattr(args, name) is None:
+            setattr(args, name, default)
 
 
     # Load an Archive file

@@ -55,16 +55,24 @@ class BandwagonCleaner(cleaners.BaseCleaner):
         nchan_masked = np.sum(weights.sum(axis=0)==0)
         nsub_masked = np.sum(weights.sum(axis=1)==0)
 
-        sub_badfrac = 1-weights.sum(axis=1)/float(nchan-nchan_masked)
-        chan_badfrac = 1-weights.sum(axis=0)/float(nsub-nsub_masked)
+        # Number of not-fully-masked channels/sub-ints. These are the
+        # denominators for the bad-fraction calculations below. Guard against
+        # a fully-masked archive (every channel or every sub-int already
+        # masked), which would otherwise divide by zero and produce inf/nan.
+        nchan_good = nchan - nchan_masked
+        nsub_good = nsub - nsub_masked
 
-        sub_is_bad = np.argwhere(sub_badfrac>self.configs.badchantol)
-        for isub in sub_is_bad:
-            clean_utils.zero_weight_subint(ar, isub)
+        if nchan_good > 0:
+            sub_badfrac = 1-weights.sum(axis=1)/float(nchan_good)
+            sub_is_bad = np.argwhere(sub_badfrac>self.configs.badchantol)
+            for isub in sub_is_bad:
+                clean_utils.zero_weight_subint(ar, isub)
 
-        chan_is_bad = np.argwhere(chan_badfrac>self.configs.badsubtol)
-        for ichan in chan_is_bad:
-            clean_utils.zero_weight_chan(ar, ichan)
+        if nsub_good > 0:
+            chan_badfrac = 1-weights.sum(axis=0)/float(nsub_good)
+            chan_is_bad = np.argwhere(chan_badfrac>self.configs.badsubtol)
+            for ichan in chan_is_bad:
+                clean_utils.zero_weight_chan(ar, ichan)
 
 
 Cleaner = BandwagonCleaner

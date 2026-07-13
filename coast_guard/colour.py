@@ -8,7 +8,6 @@ Patrick Lazarus, August 28th, 2009
 """
 
 import optparse
-import types
 
 from coast_guard import config
 
@@ -85,7 +84,7 @@ def cset(preset=None, fg='default', bg='default', **attr):
         
         if fg in fg_colours:
             fg_val = fg_colours[fg]
-        elif type(fg) == types.IntType or fg.isdigit():
+        elif type(fg) == int or fg.isdigit():
             fg_val = str(fg)
         else:
             print("Unrecognized foreground colour:", fg)
@@ -93,7 +92,7 @@ def cset(preset=None, fg='default', bg='default', **attr):
             
         if bg in bg_colours:
             bg_val = bg_colours[bg]
-        elif type(bg) == types.IntType or bg.isdigit():
+        elif type(bg) == int or bg.isdigit():
             bg_val = str(bg)
         else:
             print("Unrecognized background colour:", bg)

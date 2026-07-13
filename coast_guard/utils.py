@@ -12,11 +12,9 @@ import glob
 import optparse
 import sys
 import subprocess
-import types
 import inspect
 import datetime
 import argparse
-import string
 import tempfile
 import stat
 
@@ -446,7 +444,7 @@ def normalise_parfile(par):
         Output:
             parfn: Name of (temporary) parfile.
     """
-    if isinstance(par, types.StringTypes):
+    if isinstance(par, str):
         # Assume input is
         if os.path.isfile(par):
             # Assume input is par filename
@@ -724,15 +722,15 @@ def execute(cmd, stdout=subprocess.PIPE, stderr=sys.stderr, dir=None):
 
     stdoutfile = False
     stderrfile = False
-    if type(stdout) == types.StringType:
+    if type(stdout) == str:
         stdout = open(stdout, 'w')
         stdoutfile = True
-    if type(stderr) == types.StringType:
+    if type(stderr) == str:
         stderr = open(stderr, 'w')
         stderrfile = True
-    
+
     # Run (and time) the command. Check for errors.
-    if type(cmd) == types.StringType:
+    if type(cmd) == str:
         shell=True
     else:
         shell=False
@@ -1295,7 +1293,7 @@ def sort_by_keys(tosort, keys):
         else:
             rev = False
             print_info("Sorting by %s..." % sortkey, 2)
-        if type(tosort[0][sortkey]) is types.StringType:
+        if type(tosort[0][sortkey]) is str:
             tosort.sort(key=lambda x: x[sortkey].lower(), reverse=rev)
         else:
             tosort.sort(key=lambda x: x[sortkey], reverse=rev)
@@ -1394,10 +1392,10 @@ class ArchiveFile(object):
         """
         filterfunc = lambda x: x # A do-nothing filter
         if (type(key) in (type('str'), type(u'str'))) and key.endswith("_L"):
-            filterfunc = string.lower
+            filterfunc = str.lower
             key = key[:-2]
         elif (type(key) in (type('str'), type(u'str'))) and key.endswith("_U"):
-            filterfunc = string.upper
+            filterfunc = str.upper
             key = key[:-2]
         if key not in self.hdr:
             if key == 'snr':

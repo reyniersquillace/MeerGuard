@@ -96,7 +96,11 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
         self.configs.add_param('aggressive', config_types.BoolVal,
                                aliases=['aggressive'],
                                nullable=True,
-                               help="Whether to use more aggressive cleaning thresholds and algorithms (chanthresh=5.0, subint_thresh=5.0, badchantol=0.8, badsubtol=0.8)")
+                               help="Whether to use more aggressive cleaning algorithms. When True, "
+                                    "RFI is flagged by the maximum of the diagnostic tests rather "
+                                    "than their average. The accompanying aggressive thresholds "
+                                    "(chanthresh=5.0, subintthresh=5.0, badchantol=0.8, badsubtol=0.8) "
+                                    "are wired in by clean_archive.py unless overridden on the command line.")
         self.configs.add_param('iterations', config_types.IntVal,
                                aliases=['iterations', 'iter'],
                                nullable=True,
@@ -119,27 +123,25 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             Outputs:
                 None - The archive is cleaned in-place.
         """
-        for ii in range(self.configs.iterations):
-            print("Surgical cleaner iteration {0}".format(ii+1))
+        # 'plot' always has a default (plot=None in surgical_default_params),
+        # so determine it once, before the iteration loop.
+        if self.configs.plot is None:
+            plot = False
+        else:
+            plot = self.configs.plot
 
-            try:        
-                if self.configs.plot is None:
-                    plot = False
-                else:
-                    plot = self.configs.plot
-            except KeyError:
-                print("Plot keyword not found. Plotting disabled")
+        if plot:
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib
+                matplotlib.use('Agg')  # use non-interactive backend
+            except Exception as e:
+                print(e)
+                print("MeerGuard failed to import matplotlib: Diagnostic plotting unavailable")
                 plot = False
 
-            if plot:
-                try:
-                    import matplotlib.pyplot as plt
-                    import matplotlib
-                    matplotlib.use('Agg')  # use non-interactive backend
-                except Exception as e:
-                    print(e)
-                    print("MeerGuard failed to import matplotlib: Diagnostic plotting unavailable")
-                    plot = False
+        for ii in range(self.configs.iterations):
+            print("Surgical cleaner iteration {0}".format(ii+1))
 
             patient = ar.clone()
             patient.pscrunch()
@@ -204,7 +206,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             weights = patient.get_weights()
             # Get data (select first polarization - recall we already P-scrunched)
             data = patient.get_data()[:,0,:,:]
-            weights[(data[:,:,0] == 0)] = 0  # Make sure that any zeroed data is masked
+            weights[~data.any(axis=2)] = 0  # Make sure that any fully-zeroed profile is masked
             data = clean_utils.apply_weights(data, weights)
             if plot:
                 preop_data = preop_patient.get_data()[:,0,:,:]
@@ -248,8 +250,8 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             for ii in range(0, np.shape(data)[0]):
                 for jj in range(0, np.shape(data)[1]):
                     if data.mask[ii, jj, :].any():
-                        # Mask all
-                        data.mask[ii, jj, :] = True*np.shape(masked_template.mask)
+                        # Mask all bins in this profile
+                        data.mask[ii, jj, :] = True
                         continue
                     data.mask[ii, jj, :] = masked_template.mask
             if plot:

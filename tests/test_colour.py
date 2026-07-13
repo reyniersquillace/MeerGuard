@@ -68,6 +68,19 @@ class TestCset:
         assert colour.current_code.startswith('\033[1;')
         colour.creset()
 
+    def test_numeric_fg_colour_code(self):
+        # Previously a Python-2 bug (types.IntType). An integer colour code
+        # should be accepted and embedded verbatim.
+        colour.cset(fg=31)
+        assert '31' in colour.current_code
+        colour.creset()
+
+    def test_numeric_string_bg_colour_code(self):
+        # A digit-string colour code is also accepted (fg.isdigit() branch).
+        colour.cset(bg='44')
+        assert '44' in colour.current_code
+        colour.creset()
+
 
 class TestPresetTables:
     def test_all_presets_are_escape_codes(self):

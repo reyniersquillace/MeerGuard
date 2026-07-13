@@ -103,11 +103,20 @@ class TestSortByKeys:
         # Early-return path avoids the Python-2 code below.
         assert utils.sort_by_keys([], ['x']) == []
 
-    @pytest.mark.xfail(reason="sort_by_keys uses Python-2-only types.StringType; "
-                              "raises AttributeError under Python 3 for non-empty "
-                              "input (suspected code bug)",
-                       raises=AttributeError, strict=True)
     def test_sort_numeric_values(self):
+        # Previously a Python-2 bug (types.StringType); now uses builtin str.
         data = [{'v': 3}, {'v': 1}, {'v': 2}]
         utils.sort_by_keys(data, ['v'])
         assert [d['v'] for d in data] == [1, 2, 3]
+
+    def test_sort_string_values_case_insensitive(self):
+        # Exercises the str-type branch (the type-check that was broken on
+        # Python 3). String keys are sorted case-insensitively.
+        data = [{'name': 'Banana'}, {'name': 'apple'}, {'name': 'Cherry'}]
+        utils.sort_by_keys(data, ['name'])
+        assert [d['name'] for d in data] == ['apple', 'Banana', 'Cherry']
+
+    def test_reverse_sort(self):
+        data = [{'v': 1}, {'v': 3}, {'v': 2}]
+        utils.sort_by_keys(data, ['v_r'])
+        assert [d['v'] for d in data] == [3, 2, 1]

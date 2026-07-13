@@ -8,6 +8,7 @@ import multiprocessing
 
 import numpy as np
 import scipy.optimize
+import scipy.linalg
 
 from coast_guard import config
 from coast_guard import errors
@@ -45,7 +46,6 @@ def comprehensive_stats(data, axis, **kwargs):
     subintthresh = kwargs.pop('subintthresh', config.cfg.clean_subintthresh)
     aggressive = kwargs.pop('aggressive', False)
 
-    nsubs, nchans, ubbins = data.shape
     diagnostic_functions = [
             np.ma.std, \
             np.ma.mean, \
@@ -87,6 +87,15 @@ def channel_scaler(array2d, **kwargs):
         breakpoints = [[]]*len(orders)
     if numpieces is None:
         numpieces = [None]*len(orders)
+    if not (len(orders) == len(breakpoints) == len(numpieces)):
+        # zip() below silently truncates to the shortest sequence, dropping
+        # detrend passes. Warn so the mismatch is not silent.
+        warnings.warn("chan_order/chan_breakpoints/chan_numpieces have "
+                      "mismatched lengths (%d/%d/%d); only the first %d "
+                      "detrend pass(es) will run."
+                      % (len(orders), len(breakpoints), len(numpieces),
+                         min(len(orders), len(breakpoints), len(numpieces))),
+                      errors.CoastGuardWarning)
 
     scaled = np.empty_like(array2d)
     nchans = array2d.shape[1]
@@ -112,6 +121,15 @@ def subint_scaler(array2d, **kwargs):
         breakpoints = [[]]*len(orders)
     if numpieces is None:
         numpieces = [None]*len(orders)
+    if not (len(orders) == len(breakpoints) == len(numpieces)):
+        # zip() below silently truncates to the shortest sequence, dropping
+        # detrend passes. Warn so the mismatch is not silent.
+        warnings.warn("subint_order/subint_breakpoints/subint_numpieces have "
+                      "mismatched lengths (%d/%d/%d); only the first %d "
+                      "detrend pass(es) will run."
+                      % (len(orders), len(breakpoints), len(numpieces),
+                         min(len(orders), len(breakpoints), len(numpieces))),
+                      errors.CoastGuardWarning)
 
     scaled = np.empty_like(array2d)
     nsubs = array2d.shape[0]
@@ -188,7 +206,7 @@ def fit_poly(ydata, xdata, order=1):
 
     return x, poly_ydata
 
-def detrend(ydata, xdata=None, order=1, bp=[], numpieces=None):
+def detrend(ydata, xdata=None, order=1, bp=None, numpieces=None):
     """Detrend 'data' using a polynomial of given order.
 
         Inputs:
@@ -208,6 +226,8 @@ def detrend(ydata, xdata=None, order=1, bp=[], numpieces=None):
         Output:
             detrended: a 1D array.
     """
+    if bp is None:
+        bp = []
     ymasked = np.ma.masked_array(ydata, mask=np.ma.getmaskarray(ydata))
     if xdata is None:
         xdata = np.ma.masked_array(np.arange(ydata.size), mask=np.ma.getmaskarray(ydata))
@@ -385,9 +405,13 @@ def fft_rotate(data, bins):
         Outputs:
             rotated: The rotated data.
     """
-    freqs = np.arange(data.size/2+1, dtype=np.float64)
+    # Use floor division so the phasor length matches the rfft output for
+    # both even- and odd-length inputs (rfft returns data.size//2 + 1 bins).
+    freqs = np.arange(data.size//2+1, dtype=np.float64)
     phasor = np.exp(complex(0.0, 2.0*np.pi) * freqs * bins / float(data.size))
-    return np.fft.irfft(phasor*np.fft.rfft(data))
+    # Pass n=data.size so odd-length arrays are reconstructed at their
+    # original length (irfft otherwise assumes an even-length signal).
+    return np.fft.irfft(phasor*np.fft.rfft(data), n=data.size)
 
 
 def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):

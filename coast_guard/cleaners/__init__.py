@@ -216,7 +216,7 @@ class Configurations(dict):
     def to_string(self):
         """Return a normalised, sorted '<param>=<val>,...' config string."""
         # Sort to normalise order
-        return ','.join(sorted(['%s=%s' % ii for ii in self.cfgstrs.iteritems()]))
+        return ','.join(sorted(['%s=%s' % ii for ii in self.cfgstrs.items()]))
 
 
     def set_from_string(self, cfgstr):
@@ -235,7 +235,7 @@ class Configurations(dict):
             self[key] = val
 
 
-    def add_param(self, name, cfgtype, default=None, aliases=[], \
+    def add_param(self, name, cfgtype, default=None, aliases=None, \
                   help='', nullable=False):
         """Add a single configuration parameter.
 
@@ -254,6 +254,8 @@ class Configurations(dict):
             Outputs:
                 None - The parameters are created and stored.
         """
+        if aliases is None:
+            aliases = []
         # Check that name and aliases are not already in use
         for key in [name]+aliases:
             if (key in self.types) or (key in self.aliases):

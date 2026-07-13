@@ -27,13 +27,19 @@ class TestFftRotate:
         data = np.array([1., 5., 2., 8., 3., 4.])
         npt.assert_allclose(cu.fft_rotate(data, 0), data, atol=1e-9)
 
-    @pytest.mark.xfail(reason="fft_rotate builds the phasor with np.arange(size/2+1) "
-                              "which has the wrong length for odd-size input, so the "
-                              "phasor and rfft output cannot broadcast (suspected code bug)",
-                       raises=ValueError, strict=True)
-    def test_odd_length_bug(self):
+    def test_odd_length_integer_shift(self):
+        # Previously fft_rotate used np.arange(size/2+1) (float division),
+        # which produced the wrong phasor length for odd-size input. Now
+        # fixed with floor division and an explicit irfft length.
         data = np.array([1., 5., 2., 8., 3.])  # length 5 (odd)
-        cu.fft_rotate(data, 1)
+        rotated = cu.fft_rotate(data, 1)
+        # Shift left by one bin.
+        npt.assert_allclose(rotated, np.array([5., 2., 8., 3., 1.]), atol=1e-9)
+
+    def test_odd_length_zero_shift_is_identity(self):
+        data = np.array([1., 5., 2., 8., 3.])  # length 5 (odd)
+        assert cu.fft_rotate(data, 0).size == data.size
+        npt.assert_allclose(cu.fft_rotate(data, 0), data, atol=1e-9)
 
     def test_full_period_shift_is_identity(self):
         data = np.array([1., 2., 3., 4.])

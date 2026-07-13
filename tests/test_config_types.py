@@ -212,11 +212,15 @@ class TestIntOrIntPairList:
     def test_empty(self):
         assert ct.IntOrIntPairList()._string_to_value('') == []
 
-    @pytest.mark.xfail(reason="_value_to_string uses Python-2-only types.TupleType; "
-                              "raises AttributeError under Python 3 (suspected code bug)",
-                       raises=AttributeError, strict=True)
-    def test_value_to_string_bug(self):
-        ct.IntOrIntPairList()._value_to_string([1, (2, 3)])
+    def test_value_to_string_mixed(self):
+        # Was a Python-2 bug (types.TupleType); now handled via builtin tuple.
+        assert ct.IntOrIntPairList()._value_to_string([1, (2, 3)]) == '1;2:3'
+
+    def test_value_to_string_all_ints(self):
+        assert ct.IntOrIntPairList()._value_to_string([1, 2, 3]) == '1;2;3'
+
+    def test_round_trip_mixed(self):
+        assert ct.IntOrIntPairList().normalize_param_string('1;2:3;4') == '1;2:3;4'
 
 
 class TestFloatOrFloatPairList:
@@ -224,11 +228,12 @@ class TestFloatOrFloatPairList:
         assert ct.FloatOrFloatPairList()._string_to_value('1.0;2.0:3.0') == \
             [1.0, (2.0, 3.0)]
 
-    @pytest.mark.xfail(reason="_value_to_string uses Python-2-only types.TupleType; "
-                              "raises AttributeError under Python 3 (suspected code bug)",
-                       raises=AttributeError, strict=True)
-    def test_value_to_string_bug(self):
-        ct.FloatOrFloatPairList()._value_to_string([1.0, (2.0, 3.0)])
+    def test_value_to_string_mixed(self):
+        # Was a Python-2 bug (types.TupleType); now handled via builtin tuple.
+        assert ct.FloatOrFloatPairList()._value_to_string([1.0, (2.0, 3.0)]) == '1;2:3'
+
+    def test_round_trip_mixed(self):
+        assert ct.FloatOrFloatPairList().normalize_param_string('1.5;2.0:3.0') == '1.5;2:3'
 
 
 # ---------------------------------------------------------------------------

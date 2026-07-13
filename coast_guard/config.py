@@ -225,7 +225,7 @@ cfg = ConfigManager()
 
 def main():
     """Command-line demo: load and print configs for an archive."""
-    import utils
+    from coast_guard import utils
     if len(sys.argv) > 1:
         arf = utils.ArchiveFile(sys.argv[1])
         cfg.set_override_config("something", 'newvalue!')

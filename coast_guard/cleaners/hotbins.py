@@ -9,6 +9,7 @@ from coast_guard import config
 from coast_guard import cleaners
 from coast_guard.cleaners import config_types
 from coast_guard import utils
+from coast_guard import errors
 
 
 class HotbinsCleaner(cleaners.BaseCleaner):
@@ -68,8 +69,8 @@ class HotbinsCleaner(cleaners.BaseCleaner):
         reference.pscrunch()
         if self.configs.fscrunchfirst:
             if ar.get_dedispersed():
-                raise errors.CleanError('The "hotbins" cleaner "fscrunchfirst"' \
-                                        'an only be used on non-dedispersed data.')
+                raise errors.CleanError('The "hotbins" cleaner "fscrunchfirst" ' \
+                                        'can only be used on non-dedispersed data.')
             reference.set_dispersion_measure(0)
             reference.fscrunch()
         if self.configs.tscrunchfirst:

@@ -7,6 +7,14 @@ Archive and is covered by integration tests, not here.
 Note: importing this package pulls in coast_guard.cleaners.surgical which does
 ``import psrchive`` at module scope -- the conftest psrchive stub makes that
 succeed.
+
+Bug-fixes that require a live psrchive Archive are NOT unit-tested here (they
+would need brittle mocks of the C-extension). They are exercised by integration
+testing instead:
+  * rcvrstd inclusive channel-interval zap (range(lochan, hichan + 1)).
+  * bandwagon divide-by-zero guard for a fully-masked archive.
+  * surgical fully-zeroed-profile detection (~data.any(axis=2)) and the
+    per-cell mask assignment (data.mask[ii, jj, :] = True).
 """
 import pytest
 
@@ -80,3 +88,30 @@ class TestAddParam:
         # Setting via the alias should populate the normalised key.
         configs['thresh'] = '3.5'
         assert configs['threshold'] == pytest.approx(3.5)
+
+
+class TestConfigurationsToString:
+    def test_to_string_round_trip(self):
+        # Exercises Configurations.to_string(), which previously used the
+        # Python-2-only dict.iteritems() and crashed on Python 3.
+        configs = cleaners.Configurations()
+        configs.add_param('alpha', config_types.IntVal)
+        configs.add_param('beta', config_types.FloatVal)
+        configs['alpha'] = '5'
+        configs['beta'] = '2.5'
+        # Sorted, normalised '<param>=<val>,...' string.
+        assert configs.to_string() == 'alpha=5,beta=2.5'
+
+    def test_str_delegates_to_to_string(self):
+        configs = cleaners.Configurations()
+        configs.add_param('alpha', config_types.IntVal)
+        configs['alpha'] = '7'
+        assert str(configs) == 'alpha=7'
+
+    def test_cleaner_get_config_string(self):
+        # BaseCleaner.get_config_string() routes through to_string(); make
+        # sure a real cleaner's config serialises without error.
+        cleaner = cleaners.load_cleaner('bandwagon')
+        cfgstr = cleaner.get_config_string()
+        assert 'badchantol=' in cfgstr
+        assert 'badsubtol=' in cfgstr
