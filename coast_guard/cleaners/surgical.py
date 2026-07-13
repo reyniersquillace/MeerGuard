@@ -1,3 +1,10 @@
+"""
+The 'surgical' cleaner (surgical scrub).
+
+De-weights individual profiles (sub-int/channel cells) whose off-pulse
+residuals stand out relative to others in the same channel or sub-int,
+after removing a (optionally supplied) template profile.
+"""
 import numpy as np
 from coast_guard import config
 from coast_guard import cleaners
@@ -11,12 +18,17 @@ from scipy.signal import savgol_filter
 import psrchive
 
 class SurgicalScrubCleaner(cleaners.BaseCleaner):
+    """Cleaner that de-weights outlier profiles using multiple statistics.
+    """
     name = 'surgical'
     description = 'De-weight profiles that stand out compared to others ' \
                     'in the same subint/channel using multiple stats.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'surgical_default_params' config.
+        """
         self.configs.add_param('chanthresh', config_types.FloatVal, \
                          aliases=['cthresh'], \
                          help='The threshold (in number of sigmas) a ' \
@@ -93,7 +105,20 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """Surgically scrub RFI from 'ar' in-place.
 
+            For each iteration: clone and pre-process the archive, remove a
+            template profile (self-derived or from a supplied template file),
+            compute robust per-cell statistics over the off-pulse residuals,
+            and zero-weight the sub-int/channel cells flagged as RFI on the
+            original archive.
+
+            Input:
+                ar: The archive object to clean.
+
+            Outputs:
+                None - The archive is cleaned in-place.
+        """
         for ii in range(self.configs.iterations):
             print("Surgical cleaner iteration {0}".format(ii+1))
 

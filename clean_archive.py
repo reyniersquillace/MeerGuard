@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+"""
+Command-line entry point for running MeerGuard on a single PSRCHIVE archive.
+
+Loads an archive, applies the surgical and bandwagon cleaners with
+user-specified thresholds, and writes out the cleaned archive.
+"""
+
 # For python3 and python2 compatibility
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
@@ -11,6 +18,22 @@ import psrchive as ps
 import os
 
 def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggressive=False, iterations=1):
+    """Apply the surgical cleaner to an archive in place.
+
+        Inputs:
+            ar: The psrchive Archive object to clean.
+            tmp: Path to the (optionally 2D) template file to use.
+            cthresh: Channel threshold in sigma. (Default: 7.0)
+            sthresh: Sub-int threshold in sigma. (Default: 7.0)
+            plot: If True, produce diagnostic plots. (Default: False)
+            aggressive: If True, use more aggressive cleaning thresholds
+                and algorithms. (Default: False)
+            iterations: Number of times to run the surgical cleaner.
+                (Default: 1)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     print("Applying the surgical cleaner")
     print("\t channel threshold = {0}".format(cthresh))
     print("\t  subint threshold = {0}".format(sthresh))
@@ -22,6 +45,21 @@ def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggres
     surgical_cleaner.run(ar)
 
 def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
+    """Apply the bandwagon cleaner to an archive in place.
+
+        This de-weights whole sub-ints/channels once the fraction of
+        already-masked profiles they contain exceeds the given tolerances.
+
+        Inputs:
+            ar: The psrchive Archive object to clean.
+            badchantol: The fraction of bad channels tolerated before a
+                sub-int is completely masked. (Default: 0.95)
+            badsubtol: The fraction of bad sub-ints tolerated before a
+                channel is completely masked. (Default: 0.95)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     print("Applying the bandwagon cleaner")
     print("\t channel threshold = {0}".format(badchantol))
     print("\t  subint threshold = {0}".format(badsubtol))

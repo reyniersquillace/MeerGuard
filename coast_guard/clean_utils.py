@@ -16,6 +16,15 @@ from coast_guard import errors
 
 # takes an archive and determines fractional zapping for each frequency channel
 def freq_fraczap(ar):
+    """Determine the fraction of sub-ints zapped in each frequency channel.
+
+        Input:
+            ar: The psrchive archive object.
+
+        Output:
+            out: A list of [frequency, zapped_fraction] pairs, one per
+                channel.
+    """
     weights=np.bitwise_not(np.expand_dims(ar.get_weights(),2).astype(bool))
     nsub, nchan, nbool = np.shape(weights)
     weights = 1*weights
@@ -29,10 +38,12 @@ def freq_fraczap(ar):
     return out
 
 def get_subint_weights(ar):
+    """Return the summed weight of each sub-int (summed over channels)."""
     return ar.get_weights().sum(axis=1)
 
 
 def get_chan_weights(ar):
+    """Return the summed weight of each channel (summed over sub-ints)."""
     return ar.get_weights().sum(axis=0)
 
 
@@ -141,6 +152,20 @@ def subint_scaler(array2d, **kwargs):
 
 
 def get_robust_std(data, weights, trimfrac=0.1):
+    """Return a robust estimate of the standard deviation of 'data'.
+
+        The estimate is based on the median absolute deviation (MAD) of the
+        unmasked (weighted) data, scaled by 1.4826 to be consistent with the
+        standard deviation for normally distributed data.
+
+        Inputs:
+            data: The data array.
+            weights: A boolean array; False entries are masked out.
+            trimfrac: Unused. (Default: 0.1)
+
+        Output:
+            std: The robust standard-deviation estimate.
+    """
     mdata = np.ma.masked_where(np.bitwise_not(weights), data)
     unmasked = mdata.compressed()
     mad = np.median(np.abs(unmasked-np.median(unmasked)))
@@ -233,6 +258,22 @@ def detrend(ydata, xdata=None, order=1, bp=[], numpieces=None):
 
 
 def iterative_detrend(ydata, thresh=5, reset_mask=True, *args, **kwargs):
+    """Detrend 'ydata' iteratively, masking outliers between iterations.
+
+        Outliers (points more than 'thresh' MADs from the median) are
+        masked and the data re-detrended until the mask stops changing.
+
+        Inputs:
+            ydata: A 1D array to be detrended.
+            thresh: Outlier threshold in units of the median absolute
+                deviation. (Default: 5)
+            reset_mask: If True, restore the input's original mask on the
+                returned array. (Default: True)
+            args, kwargs: Additional arguments passed to detrend().
+
+        Output:
+            detrended: The detrended (masked) 1D array.
+    """
     origmask = np.ma.getmaskarray(ydata)
     ymasked = np.ma.masked_array(ydata, mask=origmask)
     if not np.ma.count(ymasked):
@@ -264,10 +305,24 @@ def iterative_detrend(ydata, thresh=5, reset_mask=True, *args, **kwargs):
     return ymasked
 
 def get_profile(data):
+    """Return the profile obtained by summing 'data' over its first axis."""
     return np.sum(data, axis=0)
 
 
 def scale_data(data, weights, subband_size=16, time_kernel_size=5):
+    """Scale data both in frequency (per subband) and in time.
+
+        Inputs:
+            data: A 3D array (nsub x nchan x nbin).
+            weights: The corresponding 2D weights array (nsub x nchan).
+            subband_size: Number of channels combined per subband when
+                scaling in frequency. (Default: 16)
+            time_kernel_size: Kernel size used when scaling in time.
+                (Default: 5)
+
+        Output:
+            data: The scaled data array.
+    """
     nsubs, nchans, nbins = data.shape
     # First scale chans
     for ichan in nchans:
@@ -284,6 +339,18 @@ def scale_data(data, weights, subband_size=16, time_kernel_size=5):
 
 
 def scale_subints(data, kernel_size=5, subintweights=None):
+    """Scale sub-int data by subtracting a running median of neighbours.
+
+        Inputs:
+            data: A 1D array of per-sub-int values.
+            kernel_size: The number of neighbouring sub-ints (centred on
+                each point) used to compute the median. (Default: 5)
+            subintweights: A boolean array marking which sub-ints are good.
+                (Default: treat all sub-ints as good)
+
+        Output:
+            scaled: The scaled 1D array.
+    """
     scaled = np.empty(len(data))
     if subintweights is None:
         subintweights = np.ones(len(data), dtype=bool)
@@ -330,6 +397,16 @@ def scale_chans(data, nchans=16, chanweights=None):
 
 
 def get_chan_stats(ar):
+    """Return a normalised per-channel standard-deviation statistic.
+
+        Input:
+            ar: The psrchive archive object.
+
+        Output:
+            stats: A 1D array (one value per channel) of the scaled
+                channel standard deviations, normalised by their own
+                standard deviation.
+    """
     nchans = ar.get_nchan()
     data = get_chans(ar, remove_prof=True)
     std = scale(data.std(axis=1), get_chan_weights(ar).astype(bool))
@@ -337,6 +414,21 @@ def get_chan_stats(ar):
 
 
 def get_chans(ar, remove_prof=False, use_weights=True):
+    """Return per-channel data (summed over sub-ints) for an archive.
+
+        The archive is cloned, baseline-removed, dedispersed and
+        p-scrunched before extracting the data.
+
+        Inputs:
+            ar: The psrchive archive object.
+            remove_prof: If True, subtract the (summed) profile from each
+                sub-int/channel before summing. (Default: False)
+            use_weights: If True, apply the archive's weights.
+                (Default: True)
+
+        Output:
+            data: A 2D array (nchan x nbin) of channel data.
+    """
     clone = ar.clone()
     clone.remove_baseline()
     clone.dedisperse()
@@ -354,6 +446,14 @@ def get_chans(ar, remove_prof=False, use_weights=True):
 
 
 def get_frequencies(ar):
+    """Return an array of the centre frequencies of each channel.
+
+        Input:
+            ar: The psrchive archive object.
+
+        Output:
+            freqs: A 1D array of channel centre frequencies (MHz).
+    """
     integ = ar.get_first_Integration()
     nchan = ar.get_nchan()
     freqs = np.empty(nchan)
@@ -362,6 +462,21 @@ def get_frequencies(ar):
     return freqs
 
 def get_subints(ar, remove_prof=False, use_weights=True):
+    """Return per-sub-int data (summed over channels) for an archive.
+
+        The archive is cloned, baseline-removed, set to DM=0, dedispersed
+        and p-scrunched before extracting the data.
+
+        Inputs:
+            ar: The psrchive archive object.
+            remove_prof: If True, subtract the (summed) profile from each
+                sub-int/channel before summing. (Default: False)
+            use_weights: If True, apply the archive's weights.
+                (Default: True)
+
+        Output:
+            data: A 2D array (nsub x nbin) of sub-int data.
+    """
     clone = ar.clone()
     clone.remove_baseline()
     clone.set_dispersion_measure(0)
@@ -380,6 +495,15 @@ def get_subints(ar, remove_prof=False, use_weights=True):
 
 
 def apply_weights(data, weights):
+    """Multiply data by its per-sub-int/channel weights.
+
+        Inputs:
+            data: A 3D array (nsub x nchan x nbin).
+            weights: A 2D array (nsub x nchan) of weights.
+
+        Output:
+            data: The weighted data array.
+    """
     nsubs, nchans, nbins = data.shape
     for isub in range(nsubs):
         data[isub] = data[isub]*weights[isub,...,np.newaxis]
@@ -403,6 +527,15 @@ def fft_rotate(data, bins):
 
 
 def fit_template(prof, template):
+    """Least-squares fit a scaled-plus-offset template to a profile.
+
+        Inputs:
+            prof: The 1D profile data to fit.
+            template: The 1D template to scale/offset.
+
+        Output:
+            params: The best-fit [amplitude, offset] parameters.
+    """
     warnings.warn("Does this fitting work properly?", errors.CoastGuardWarning)
     # Define the error function for the leastsq fit
     err = lambda params: params[0]*template - prof - params[1]
@@ -420,6 +553,23 @@ def fit_template(prof, template):
 
 
 def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
+    """Fit and subtract a (rotated, scaled) template from a single profile.
+
+        Inputs:
+            prof: The 1D profile data.
+            isub: The sub-int index (returned for bookkeeping).
+            ichan: The channel index (returned for bookkeeping).
+            template: The 1D template profile.
+            phs: The phase (in bins) by which to rotate the template.
+            return_params: If True, also return the fit parameters.
+                (Default: False)
+
+        Outputs:
+            (isub, ichan): The input indices.
+            residual: The profile with the fitted template removed (zeros
+                if the fit failed).
+            params: (only if return_params) The best-fit amplitude(s).
+    """
     rotated_template = fft_rotate(template, phs)
     err = lambda amp: amp*rotated_template - prof
     params, status = scipy.optimize.leastsq(err, [np.median(prof)/np.median(template)])
@@ -440,6 +590,19 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
             return (isub, ichan), err(params)
 
 def remove_profile(data, nsubs, nchans, template, nthreads=None):
+    """Remove a template profile from every sub-int/channel of 'data'.
+
+        Inputs:
+            data: A 3D array (nsub x nchan x nbin) modified in place.
+            nsubs: The number of sub-ints.
+            nchans: The number of channels.
+            template: The 1D template profile to remove.
+            nthreads: Number of worker processes to use. If >1 the work is
+                parallelised. (Default: use value from config files)
+
+        Output:
+            data: The data array with the profile removed.
+    """
     if nthreads is None:
         nthreads = config.cfg.nthreads
     if nthreads == 1:
@@ -462,6 +625,19 @@ def remove_profile(data, nsubs, nchans, template, nthreads=None):
 
 
 def remove_profile1d_inplace(prof, isub, ichan, template):
+    """Fit and subtract an (unrotated) scaled template from a profile.
+
+        Inputs:
+            prof: The 1D profile data.
+            isub: The sub-int index (returned for bookkeeping).
+            ichan: The channel index (returned for bookkeeping).
+            template: The 1D template profile.
+
+        Outputs:
+            (isub, ichan): The input indices.
+            residual: The profile with the fitted template removed, or
+                None if the fit failed.
+    """
     #err = lambda (amp, phs): amp*fft_rotate(template, phs) - prof
     #params, status = scipy.optimize.leastsq(err, [1, 0])
     err = lambda amp: amp*template - prof
@@ -475,6 +651,24 @@ def remove_profile1d_inplace(prof, isub, ichan, template):
 
 
 def remove_profile_inplace(ar, template, phs, nthreads=1):
+    """Remove a template profile from an archive in place.
+
+        For each sub-int/channel the template (a 1D profile, or a 2D array
+        indexed by channel) is fitted and subtracted. Profiles whose fit
+        fails are zero-weighted.
+
+        Inputs:
+            ar: The (P-scrunched) psrchive archive object, modified in
+                place.
+            template: The template profile. Either 1D (nbin) or 2D
+                (nchan x nbin).
+            phs: The phase (in bins) by which to rotate the template.
+            nthreads: Number of worker processes to use. If >1 the work is
+                parallelised. (Default: 1)
+
+        Outputs:
+            None - The archive is modified in place.
+    """
     data = ar.get_data()[:,0,:,:] # Select first polarization channel
                                   # archive is P-scrunched, so this is
                                   # total intensity, the only polarization
@@ -516,17 +710,29 @@ def remove_profile_inplace(ar, template, phs, nthreads=1):
 
 
 def zero_weight_subint(ar, isub):
+    """Set the weight of sub-int 'isub' to zero (de-weight it entirely)."""
     subint = ar.get_Integration(int(isub))
     subint.uniform_weight(0.0)
 
 
 def zero_weight_chan(ar, ichan):
+    """Set the weight of channel 'ichan' to zero in every sub-int."""
     for isub in range(ar.get_nsubint()):
         subint = ar.get_Integration(int(isub))
         subint.set_weight(int(ichan), 0.0)
 
 
 def clean_hot_bins(ar, thresh=2.0):
+    """Find and replace hot bins in each (unmasked) sub-int of an archive.
+
+        Inputs:
+            ar: The psrchive archive object, cleaned in place.
+            thresh: The threshold (for the K^2 normality statistic) used
+                to identify hot bins. (Default: 2.0)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     subintdata = get_subints(ar, remove_prof=True)
     subintweights = get_subint_weights(ar).astype(bool)
 
@@ -554,6 +760,21 @@ def clean_hot_bins(ar, thresh=2.0):
 
 
 def clean_subint(ar, isub, bins):
+    """Replace the given phase bins of a sub-int with white noise.
+
+        For every (weighted) channel/polarization profile in sub-int
+        'isub', the values in 'bins' are replaced with Gaussian noise
+        matched to the profile's off-(masked)-bin mean and standard
+        deviation.
+
+        Inputs:
+            ar: The psrchive archive object, cleaned in place.
+            isub: The sub-int index to clean.
+            bins: A list of phase-bin indices to replace.
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     npol = ar.get_npol()
     nchan = ar.get_nchan()
     nbins = ar.get_nbin()

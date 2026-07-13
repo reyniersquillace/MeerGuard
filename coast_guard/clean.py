@@ -219,7 +219,23 @@ def power_wash(ar):
 
 
 def deep_clean(toclean, chanthresh=None, subintthresh=None, binthresh=None):
-    import psrchive # Temporarily, because python bindings 
+    """Aggressively clean an archive by de-weighting outlier channels
+        and sub-ints (based on their mean and standard deviation) and
+        replacing hot bins.
+
+        Inputs:
+            toclean: The archive to be cleaned (modified in-place).
+            chanthresh: Threshold (in sigma) for de-weighting a channel.
+                (Default: use value from config files)
+            subintthresh: Threshold (in sigma) for de-weighting a sub-int.
+                (Default: use value from config files)
+            binthresh: Threshold (in sigma) for cleaning hot bins.
+                (Default: use value from config files)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
+    import psrchive # Temporarily, because python bindings
                     # are not available on all computers
     
     if chanthresh is None:
@@ -320,6 +336,19 @@ def deep_clean(toclean, chanthresh=None, subintthresh=None, binthresh=None):
 
 
 def clean_simple(ar, timethresh=1.0, freqthresh=3.0):
+    """Clean an archive by de-weighting whole sub-ints and channels
+        whose statistics exceed fixed thresholds.
+
+        Inputs:
+            ar: The archive to be cleaned (modified in-place).
+            timethresh: Threshold on the sub-int statistic above which a
+                sub-int is de-weighted. (Default: 1.0)
+            freqthresh: Threshold on the channel statistic above which a
+                channel is de-weighted. (Default: 3.0)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     # Get stats for subints
     subint_stats = get_subint_stats(ar)
     
@@ -335,6 +364,17 @@ def clean_simple(ar, timethresh=1.0, freqthresh=3.0):
 
 
 def clean_iterative(ar, threshold=2.0):
+    """Iteratively clean an archive by repeatedly de-weighting the single
+        worst sub-int or channel until nothing exceeds the threshold.
+
+        Inputs:
+            ar: The archive to be cleaned (modified in-place).
+            threshold: The statistic threshold below which cleaning stops.
+                (Default: 2.0)
+
+        Outputs:
+            None - The archive is cleaned in place.
+    """
     ii = 0
     while True:
         # Get stats for subints
@@ -515,7 +555,25 @@ def remove_bad_channels(infn, badchans=None, badchan_intervals=None,
 
 
 def clean_archive(inarf, outfn, clean_re=None, *args, **kwargs):
-    import psrchive # Temporarily, because python bindings 
+    """Clean an archive file and write the result to a new file.
+
+        A copy of the input file is made, standard band trimming/pruning
+        and bad-channel/sub-int removal are applied, and then a cleaning
+        function whose name matches 'clean_re' is run. On any failure the
+        (partial) output file is removed before the error is re-raised.
+
+        Inputs:
+            inarf: The input ArchiveFile object.
+            outfn: The output file name (may contain format codes).
+            clean_re: A regular expression selecting the cleaning function
+                to apply. Exactly one cleaner must match.
+                (Default: use value from config files)
+            args, kwargs: Extra arguments passed to the cleaning function.
+
+        Output:
+            outarf: The ArchiveFile object for the cleaned output file.
+    """
+    import psrchive # Temporarily, because python bindings
                     # are not available on all computers
     
     if clean_re is None:
@@ -554,6 +612,10 @@ def clean_archive(inarf, outfn, clean_re=None, *args, **kwargs):
 
 
 def main():
+    """Command-line entry point: clean each selected input archive by
+        running the queue of cleaners built up from the parsed arguments,
+        writing each cleaned archive to its output file.
+    """
     print("")
     print("         clean.py")
     print("     Patrick  Lazarus")
@@ -593,7 +655,14 @@ def main():
         
     
 class CleanerArguments(utils.DefaultArguments):
+    """Argument parser for clean.py.
+
+        Extends DefaultArguments with a custom help action (which can print
+        help for a named cleaner) and actions for building up a queue of
+        cleaners and their configuration strings.
+    """
     def __init__(self, *args, **kwargs):
+        """Create the parser and add the custom '-h/--help' option."""
         super(CleanerArguments, self).__init__(add_help=False, \
                                                 *args, **kwargs)
         self.add_argument('-h', '--help', nargs='?', dest='help_topic', \
@@ -604,6 +673,7 @@ class CleanerArguments(utils.DefaultArguments):
                                 "its help.")
 
     class HelpAction(argparse.Action):
+        """Print the general help, or help for a named cleaner, then exit."""
         def __call__(self, parser, namespace, values, option_string):
             if values is None:
                 parser.print_help()
@@ -613,6 +683,7 @@ class CleanerArguments(utils.DefaultArguments):
             sys.exit(1)
 
     class ListCleanersAction(argparse.Action):
+        """Print all available cleaners and their descriptions, then exit."""
         def __call__(self, parser, namespace, values, option_string):
             colour.cprint("Available Cleaners:", \
                             bold=True, underline=True) 
@@ -622,12 +693,14 @@ class CleanerArguments(utils.DefaultArguments):
             sys.exit(1)
 
     class AppendCleanerAction(argparse.Action):
+        """Add a named cleaner (with an empty config list) to the queue."""
         def __call__(self, parser, namespace, values, option_string):
             # Append the name of the cleaner and an empty list for
             # configuration strings
             getattr(namespace, self.dest).append((values, []))
 
     class ConfigureCleanerAction(argparse.Action):
+        """Append a config string to the most recently queued cleaner."""
         def __call__(self, parser, namespace, values, option_string):
             # Append configuration string to most recently added
             # cleaner

@@ -1,3 +1,10 @@
+"""
+The 'rcvrstd' cleaner.
+
+Prunes and tidies the observing band by pruning to the receiver's response,
+trimming band edges, and de-weighting user-specified bad sub-ints, channels
+and frequency ranges.
+"""
 import types
 import numpy as np
 from coast_guard import config
@@ -8,12 +15,17 @@ from coast_guard import utils
 
 
 class ReceiverBandCleaner(cleaners.BaseCleaner):
+    """Cleaner that prunes/trims the band and removes known-bad data.
+    """
     name = 'rcvrstd'
     description = 'Prune, and tidy the observing band by trimming edges, ' \
                   'and removing bad channels/frequency ranges.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'rcvrstd_default_params' config.
+        """
         self.configs.add_param('response', config_types.FloatPair,
                                aliases=['resp'],
                                nullable=True,
@@ -49,6 +61,9 @@ class ReceiverBandCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """Prune the band, trim edge channels, and remove bad
+            channels/sub-ints from 'ar' in-place.
+        """
         self.__prune_band_edges(ar)
         self.__trim_edge_channels(ar)
         self.__remove_bad_channels(ar)

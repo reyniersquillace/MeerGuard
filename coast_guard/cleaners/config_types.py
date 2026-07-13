@@ -1,3 +1,9 @@
+"""
+Configuration type classes for cleaner config-strings.
+
+Each ConfigType knows how to parse a parameter string into a Python value
+and to normalise a value back into a canonical string representation.
+"""
 import types
 
 
@@ -352,6 +358,8 @@ class FloatOrFloatPairList(BaseConfigType):
 
 
 class StrVal(BaseConfigType):
+    """A configuration type for string values.
+    """
     name = "A string"
     description = "A string"
     def _string_to_value(self, paramstr):

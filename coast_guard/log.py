@@ -1,3 +1,9 @@
+"""
+Logging helpers for the CoastGuard/MeerGuard pipeline.
+
+Provides per-process loggers (keyed by PID) and utilities for attaching a
+file handler and adjusting group file permissions on log files.
+"""
 import os
 import logging
 import stat
@@ -13,7 +19,18 @@ levels = {'debug': logging.DEBUG, \
 PERMS = {"w": stat.S_IWGRP,                 
          "r": stat.S_IRGRP,                 
          "x": stat.S_IXGRP}                 
-def add_group_permissions(fn, perms=""):    
+def add_group_permissions(fn, perms=""):
+    """Add group-level file permissions to a file.
+
+        Inputs:
+            fn: The name of the file to modify.
+            perms: A string of permission characters to add for the
+                group. Any of 'w' (write), 'r' (read) and 'x' (execute).
+                (Default: add no permissions)
+
+        Outputs:
+            None
+    """
     mode = os.stat(fn)[stat.ST_MODE]
     for perm in perms:
         mode |= PERMS[perm]
@@ -79,5 +96,15 @@ def disconnect_logger():
 
 
 def log(msg, levelname):
+    """Log a message at the named level using the current process's logger.
+
+        Inputs:
+            msg: The message to log.
+            levelname: The name of the logging level. One of 'debug',
+                'info', 'warning', 'error' or 'critical'.
+
+        Outputs:
+            None
+    """
     logger = get_logger()
     logger.log(levels[levelname], msg)
