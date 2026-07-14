@@ -73,8 +73,7 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 #switching to click for more versatility
 @click.command(help="Run MeerGuard on input archive file")
 #click will automatically send an error message if the user doesn't input -a and -T!
-@click.option("-a", "--archive", "archive_path", type=str, required=True, multiple=True,
-              help="REQUIRED: Path to the archive file")
+@click.argument("archive_paths", nargs=-1, required=True)
 @click.option("-T", "--template", "template_path", type=str, required=True,
               help="REQUIRED: Path to the 2D template file")
 @click.option("-c", "--chanthresh", "chan_thresh", type=float, default=None,
@@ -87,6 +86,8 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
               help="Fraction of bad subints threshold [default = 0.95 (0.8 with --aggressive)]")
 @click.option("-o", "--outname", "output_name", type=str, default=None,
               help="Output archive name")
+@click.option("-e", "--extension", "extension", type=str, default=None,
+              help="Output file extension")
 @click.option("-plot", "--plot", "plot", is_flag=True, default=False)
 @click.option("-O", "--outpath", "output_path", type=str, default=os.getcwd(),
               help="Output path [default = CWD]")
@@ -95,8 +96,8 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 @click.option("-i", "--iterations", "iterations", type=int, default=1,
               help="Number of iterations to run the surgical cleaner [default = 1]")
 
-def main(archive_path, template_path, chan_thresh, subint_thresh, badchantol,
-         badsubtol, output_name, plot, output_path, aggressive, iterations):
+def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
+         badsubtol, output_name, extension, plot, output_path, aggressive, iterations):
     
     #raise error if user tries to write multiple input files to one output name
     #have to use extension for that option
