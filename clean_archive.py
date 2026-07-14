@@ -16,6 +16,7 @@ from coast_guard import cleaners
 import argparse
 import psrchive as ps
 import os
+import click
 
 def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggressive=False, iterations=1):
     """Apply the surgical cleaner to an archive in place.
@@ -68,59 +69,76 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
     bandwagon_parameters = "badchantol={0},badsubtol={1}".format(badchantol, badsubtol)
     bandwagon_cleaner.parse_config_string(bandwagon_parameters)
     bandwagon_cleaner.run(ar)
+
+#switching to click for more versatility
+@click.command(help="Run MeerGuard on input archive file")
+#click will automatically send an error message if the user doesn't input -a and -T!
+@click.option("-a", "--archive", "archive_path", type=str, required=True,
+              help="REQUIRED: Path to the archive file")
+@click.option("-T", "--template", "template_path", type=str, required=True,
+              help="REQUIRED: Path to the 2D template file")
+@click.option("-c", "--chanthresh", "chan_thresh", type=float, default=None,
+              help="Channel threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]")
+@click.option("-s", "--subthresh", "subint_thresh", type=float, default=None,
+              help="Subint threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]")
+@click.option("-bc", "--badchantol", "badchantol", type=float, default=None,
+              help="Fraction of bad channels threshold [default = 0.95 (0.8 with --aggressive)]")
+@click.option("-bs", "--badsubtol", "badsubtol", type=float, default=None,
+              help="Fraction of bad subints threshold [default = 0.95 (0.8 with --aggressive)]")
+@click.option("-o", "--outname", "output_name", type=str, default=None,
+              help="Output archive name")
+@click.option("-plot", "--plot", "plot", is_flag=True, default=False)
+@click.option("-O", "--outpath", "output_path", type=str, default=os.getcwd(),
+              help="Output path [default = CWD]")
+@click.option("-ag", "--aggressive", "aggressive", is_flag=True, default=False,
+              help="Whether to use more aggressive cleaning thresholds and algorithms")
+@click.option("-i", "--iterations", "iterations", type=int, default=1,
+              help="Number of iterations to run the surgical cleaner [default = 1]")
+
+def main(archive_path, template_path, chan_thresh, subint_thresh, badchantol,
+         badsubtol, output_name, plot, output_path, aggressive, iterations):
     
-
-if __name__ == "__main__":
-    # Parse some arguments to set up cleaning
-    parser = argparse.ArgumentParser(description="Run MeerGuard on input archive file")
-    parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="REQUIRED: Path to the archive file")
-    parser.add_argument("-T", "--template", type=str, dest="template_path", help="REQUIRED: Path to the 2D template file")
-    parser.add_argument("-c", "--chanthresh", type=float, dest="chan_thresh", help="Channel threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
-    parser.add_argument("-s", "--subthresh", type=float, dest="subint_thresh", help="Subint threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
-    parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
-    parser.add_argument("-bs", "--badsubtol", type=float, dest="badsubtol", help="Fraction of bad subints threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
-    parser.add_argument("-o", "--outname", type=str, dest="output_name", help="Output archive name", default=None)
-    parser.add_argument("-O", "--outpath", type=str, dest="output_path", help="Output path [default = CWD]", default=os.getcwd())
-    parser.add_argument("-e", "--extension", type=str, dest="extension", help="Output extension", default=None)
-    parser.add_argument("-plot", "--plot", dest='plot', action='store_true', default=False)
-    parser.add_argument("-ag", "--aggressive", dest='aggressive', action='store_true', default=False, help="Whether to use more aggressive cleaning thresholds and algorithms")
-    parser.add_argument("-i", "--iterations", type=int, dest="iterations", help="Number of iterations to run the surgical cleaner [default = 1]", default=1)
-    args = parser.parse_args()
-
     # Resolve the cleaning thresholds. When --aggressive is given, any
     # threshold the user did NOT set explicitly on the command line falls
     # back to the documented aggressive value; otherwise it falls back to the
     # normal default. Explicit user overrides are preserved either way.
-    if args.aggressive:
+    
+    if aggressive:
         threshold_defaults = {'chan_thresh': 5.0, 'subint_thresh': 5.0,
                               'badchantol': 0.8, 'badsubtol': 0.8}
     else:
         threshold_defaults = {'chan_thresh': 7.0, 'subint_thresh': 7.0,
                               'badchantol': 0.95, 'badsubtol': 0.95}
-    for name, default in threshold_defaults.items():
-        if getattr(args, name) is None:
-            setattr(args, name, default)
-
-
+ 
+    if chan_thresh is None:
+        chan_thresh = threshold_defaults['chan_thresh']
+    if subint_thresh is None:
+        subint_thresh = threshold_defaults['subint_thresh']
+    if badchantol is None:
+        badchantol = threshold_defaults['badchantol']
+    if badsubtol is None:
+        badsubtol = threshold_defaults['badsubtol']
+ 
     # Load an Archive file
-    loaded_archive = ps.Archive_load(args.archive_path)
-    archive_path, archive_name = os.path.split(loaded_archive.get_filename())
+    loaded_archive = ps.Archive_load(archive_path)
+    archive_path_dir, archive_name = os.path.split(loaded_archive.get_filename())
     archive_name_pref = archive_name.split('.')[0]
     archive_name_suff = "".join(archive_name.split('.')[1:])
-    #psrname = archive_name_orig.split('_')[0]
-
+ 
     # Renaming archive file with statistical thresholds
-    if args.output_name is not None:
-        out_name = args.output_name
-    elif args.extension is not None:
-        out_name = "{0}.{1}".format(archive_name_pref, args.extension)
+    if output_name is None:
+        out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, chan_thresh, subint_thresh)
     else:
-        out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, args.chan_thresh, args.subint_thresh)
-
-    apply_surgical_cleaner(loaded_archive, args.template_path, cthresh=args.chan_thresh, sthresh=args.subint_thresh, plot=args.plot, aggressive=args.aggressive, iterations=args.iterations)
-    apply_bandwagon_cleaner(loaded_archive, badchantol=args.badchantol, badsubtol=args.badsubtol)
-
+        out_name = output_name
+ 
+ 
+    apply_surgical_cleaner(loaded_archive, template_path, cthresh=chan_thresh, sthresh=subint_thresh, plot=plot, aggressive=aggressive, iterations=iterations)
+    apply_bandwagon_cleaner(loaded_archive, badchantol=badchantol, badsubtol=badsubtol)
+ 
     # Unload the Archive file
     print("Unloading the cleaned archive: {0}".format(out_name))
     loaded_archive.unload(str(out_name))  # need to typecast to str here because otherwise Python converts to a unicode string which the PSRCHIVE library can't parse
-
+ 
+ 
+if __name__ == "__main__":
+    main()
