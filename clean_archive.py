@@ -80,8 +80,9 @@ if __name__ == "__main__":
     parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
     parser.add_argument("-bs", "--badsubtol", type=float, dest="badsubtol", help="Fraction of bad subints threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
     parser.add_argument("-o", "--outname", type=str, dest="output_name", help="Output archive name", default=None)
-    parser.add_argument("-plot", "--plot", dest='plot', action='store_true', default=False)
     parser.add_argument("-O", "--outpath", type=str, dest="output_path", help="Output path [default = CWD]", default=os.getcwd())
+    parser.add_argument("-e", "--extension", type=str, dest="extension", help="Output extension", default=None)
+    parser.add_argument("-plot", "--plot", dest='plot', action='store_true', default=False)
     parser.add_argument("-ag", "--aggressive", dest='aggressive', action='store_true', default=False, help="Whether to use more aggressive cleaning thresholds and algorithms")
     parser.add_argument("-i", "--iterations", type=int, dest="iterations", help="Number of iterations to run the surgical cleaner [default = 1]", default=1)
     args = parser.parse_args()
@@ -109,11 +110,12 @@ if __name__ == "__main__":
     #psrname = archive_name_orig.split('_')[0]
 
     # Renaming archive file with statistical thresholds
-    if args.output_name is None:
-        out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, args.chan_thresh, args.subint_thresh)
-    else:
+    if args.output_name is not None:
         out_name = args.output_name
-
+    elif args.extension is not None:
+        out_name = "{0}.{1}".format(archive_name_pref, args.extension)
+    else:
+        out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, args.chan_thresh, args.subint_thresh)
 
     apply_surgical_cleaner(loaded_archive, args.template_path, cthresh=args.chan_thresh, sthresh=args.subint_thresh, plot=args.plot, aggressive=args.aggressive, iterations=args.iterations)
     apply_bandwagon_cleaner(loaded_archive, badchantol=args.badchantol, badsubtol=args.badsubtol)
