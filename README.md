@@ -20,3 +20,5 @@ python clean_archive.py *rf -T my_template_file.rf -e mg -C config_file
 ```
 
 Check out `examples` for an example MeerKAT UHF archive file and template of J0045-7319 that work with `MeerGuard`. Note that because J0045-7319 is so faint and the file contains only one subintegration, the pulse is not visible in this one file. This is just an example for RFI excision testing!
+
+Note: for MeerKAT observations where each sub-integration is stored in a separate file, add all files together with `psradd` before running `MeerGuard` for best results.

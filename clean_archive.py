@@ -20,7 +20,15 @@ import psrchive as ps
 import os
 import click
 
-def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggressive=False, iterations=1):
+def apply_rcvrstd_cleaner(ar):
+    """This function applies the cleaner specified by a config file for the receiver."""
+    
+    print("Applying the receiver cleaner")
+    rcvrstd_cleaner = cleaners.load_cleaner('rcvrstd')
+    rcvrstd_cleaner.run(ar)
+
+def apply_surgical_cleaner(ar, tmp, cthresh=None, sthresh=None, plot=False, aggressive=False, iterations=1):
+    
     """Apply the surgical cleaner to an archive in place.
 
         Inputs:
@@ -41,14 +49,24 @@ def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggres
     print("\t channel threshold = {0}".format(cthresh))
     print("\t  subint threshold = {0}".format(sthresh))
     print("\t  iterations = {0}".format(iterations))
-
+    
     surgical_cleaner = cleaners.load_cleaner('surgical')
-    #avoid hard-coding receiver config
-    surgical_parameters = "chanthresh={1},subintthresh={2},template={0},plot={3},aggressive={4},iterations={5}".format(tmp, cthresh, sthresh, plot, aggressive, iterations)
+    param_parts = [
+        "template={0}".format(tmp),
+        "plot={0}".format(plot),
+        "aggressive={0}".format(aggressive),
+        "iterations={0}".format(iterations),
+    ]
+    if cthresh is not None:
+        param_parts.append("chanthresh={0}".format(cthresh))
+    if sthresh is not None:
+        param_parts.append("subintthresh={0}".format(sthresh))
+    surgical_parameters = ",".join(param_parts)
     surgical_cleaner.parse_config_string(surgical_parameters)
     surgical_cleaner.run(ar)
 
-def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
+
+def apply_bandwagon_cleaner(ar, badchantol=None, badsubtol=None):
     """Apply the bandwagon cleaner to an archive in place.
 
         This de-weights whole sub-ints/channels once the fraction of
@@ -69,8 +87,13 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
     print("\t  subint threshold = {0}".format(badsubtol))
 
     bandwagon_cleaner = cleaners.load_cleaner('bandwagon')
-    bandwagon_parameters = "badchantol={0},badsubtol={1}".format(badchantol, badsubtol)
-    bandwagon_cleaner.parse_config_string(bandwagon_parameters)
+    param_parts = []
+    if badchantol is not None:
+        param_parts.append("badchantol={0}".format(badchantol))
+    if badsubtol is not None:
+        param_parts.append("badsubtol={0}".format(badsubtol))
+    if param_parts:
+        bandwagon_cleaner.parse_config_string(",".join(param_parts))
     bandwagon_cleaner.run(ar)
 
 #switching to click for more versatility
@@ -99,7 +122,7 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 @click.option("-i", "--iterations", "iterations", type=int, default=1,
               help="Number of iterations to run the surgical cleaner [default = 1]")
 @click.option("-C", "--config", "config_path", type=str, default=None,
-              help="Custom config file for misbehaving receivers. Inputting UHF or L will"
+              help="Custom config file for misbehaving receivers. Inputting UHF or L will "
               "automatically load the MeerKAT config files for those receivers.")
 
 def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
@@ -133,14 +156,17 @@ def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
     else:
         threshold_defaults = {'chan_thresh': 7.0, 'subint_thresh': 7.0,
                               'badchantol': 0.95, 'badsubtol': 0.95}
- 
-    if chan_thresh is None:
+    
+        
+    defer_to_config = (config_path is not None) and not aggressive
+
+    if chan_thresh is None and not defer_to_config:
         chan_thresh = threshold_defaults['chan_thresh']
-    if subint_thresh is None:
+    if subint_thresh is None and not defer_to_config:
         subint_thresh = threshold_defaults['subint_thresh']
-    if badchantol is None:
+    if badchantol is None and not defer_to_config:
         badchantol = threshold_defaults['badchantol']
-    if badsubtol is None:
+    if badsubtol is None and not defer_to_config:
         badsubtol = threshold_defaults['badsubtol']
 
     #grab custom config values if sent in with -C 
@@ -171,9 +197,12 @@ def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
         elif extension is not None:
             out_name = "{0}.{1}".format(archive_name_pref, extension)
         else:
-            out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, chan_thresh, subint_thresh)
+            out_name = "{0}_ch{1}_sub{2}.ar".format(
+                archive_name_pref,
+                chan_thresh if chan_thresh is not None else "cfg",
+                subint_thresh if subint_thresh is not None else "cfg")
 
-
+        apply_rcvrstd_cleaner(loaded_archive)
         apply_surgical_cleaner(loaded_archive, template_path, cthresh=chan_thresh, sthresh=subint_thresh, plot=plot, aggressive=aggressive, iterations=iterations)
         apply_bandwagon_cleaner(loaded_archive, badchantol=badchantol, badsubtol=badsubtol)
 
