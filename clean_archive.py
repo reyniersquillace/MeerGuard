@@ -73,7 +73,7 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 #switching to click for more versatility
 @click.command(help="Run MeerGuard on input archive file")
 #click will automatically send an error message if the user doesn't input -a and -T!
-@click.option("-a", "--archive", "archive_path", type=str, required=True,
+@click.option("-a", "--archive", "archive_path", type=str, required=True, multiple=True,
               help="REQUIRED: Path to the archive file")
 @click.option("-T", "--template", "template_path", type=str, required=True,
               help="REQUIRED: Path to the 2D template file")
@@ -98,6 +98,22 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 def main(archive_path, template_path, chan_thresh, subint_thresh, badchantol,
          badsubtol, output_name, plot, output_path, aggressive, iterations):
     
+    #raise error if user tries to write multiple input files to one output name
+    #have to use extension for that option
+    if output_name is not None and len(archive_paths) > 1:
+        raise click.UsageError(
+        "-o cannot be used with multiple files. Your options are:"
+        "1. Use the -e option to replace extensions on each file."
+        "2. Use default output file names."
+        "3. Run on one archive file at a time."
+        )
+
+    #make sure there's either -o or -e, not both
+    if output_name is not None and extension is not None:
+        raise click.UsageError(
+            "-o and -e cannot be used together. "
+            "Please make your mind up... :)"
+        )
     # Resolve the cleaning thresholds. When --aggressive is given, any
     # threshold the user did NOT set explicitly on the command line falls
     # back to the documented aggressive value; otherwise it falls back to the
@@ -118,27 +134,31 @@ def main(archive_path, template_path, chan_thresh, subint_thresh, badchantol,
         badchantol = threshold_defaults['badchantol']
     if badsubtol is None:
         badsubtol = threshold_defaults['badsubtol']
- 
-    # Load an Archive file
-    loaded_archive = ps.Archive_load(archive_path)
-    archive_path_dir, archive_name = os.path.split(loaded_archive.get_filename())
-    archive_name_pref = archive_name.split('.')[0]
-    archive_name_suff = "".join(archive_name.split('.')[1:])
- 
-    # Renaming archive file with statistical thresholds
-    if output_name is None:
-        out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, chan_thresh, subint_thresh)
-    else:
-        out_name = output_name
- 
- 
-    apply_surgical_cleaner(loaded_archive, template_path, cthresh=chan_thresh, sthresh=subint_thresh, plot=plot, aggressive=aggressive, iterations=iterations)
-    apply_bandwagon_cleaner(loaded_archive, badchantol=badchantol, badsubtol=badsubtol)
- 
-    # Unload the Archive file
-    print("Unloading the cleaned archive: {0}".format(out_name))
-    loaded_archive.unload(str(out_name))  # need to typecast to str here because otherwise Python converts to a unicode string which the PSRCHIVE library can't parse
- 
- 
+
+    for archive_path in archive_paths:
+        print("Processing archive: {0}".format(archive_path))
+
+        # Load an Archive file
+        loaded_archive = ps.Archive_load(archive_path)
+        archive_path_dir, archive_name = os.path.split(loaded_archive.get_filename())
+        archive_name_pref = archive_name.split('.')[0]
+        archive_name_suff = "".join(archive_name.split('.')[1:])
+
+        # Renaming archive file with statistical thresholds
+        if output_name is not None:
+            out_name = output_name
+        elif extension is not None:
+            out_name = "{0}.{1}".format(archive_name_pref, extension)
+        else:
+            out_name = "{0}_ch{1}_sub{2}.ar".format(archive_name_pref, chan_thresh, subint_thresh)
+
+
+        apply_surgical_cleaner(loaded_archive, template_path, cthresh=chan_thresh, sthresh=subint_thresh, plot=plot, aggressive=aggressive, iterations=iterations)
+        apply_bandwagon_cleaner(loaded_archive, badchantol=badchantol, badsubtol=badsubtol)
+
+        # Unload the Archive file
+        print("Unloading the cleaned archive: {0}".format(out_name))
+        loaded_archive.unload(str(out_name))  # need to typecast to str here because otherwise Python converts to a unicode string which the PSRCHIVE library can't parse
+
 if __name__ == "__main__":
     main()
