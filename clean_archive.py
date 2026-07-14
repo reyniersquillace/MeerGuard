@@ -139,6 +139,10 @@ def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
     for archive_path in archive_paths:
         print("Processing archive: {0}".format(archive_path))
 
+        #make sure we load the per-receiver config file if it exists
+        arf = utils.ArchiveFile(archive_path)
+        config.cfg.load_configs_for_archive(arf)
+
         # Load an Archive file
         loaded_archive = ps.Archive_load(archive_path)
         archive_path_dir, archive_name = os.path.split(loaded_archive.get_filename())
