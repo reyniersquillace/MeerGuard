@@ -73,8 +73,8 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 if __name__ == "__main__":
     # Parse some arguments to set up cleaning
     parser = argparse.ArgumentParser(description="Run MeerGuard on input archive file")
-    parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="Path to the archive file")
-    parser.add_argument("-T", "--template", type=str, dest="template_path", help="Path to the 2D template file")
+    parser.add_argument("-a", "--archive", type=str, dest="archive_path", help="REQUIRED: Path to the archive file")
+    parser.add_argument("-T", "--template", type=str, dest="template_path", help="REQUIRED: Path to the 2D template file")
     parser.add_argument("-c", "--chanthresh", type=float, dest="chan_thresh", help="Channel threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
     parser.add_argument("-s", "--subthresh", type=float, dest="subint_thresh", help="Subint threshold (in sigma) [default = 7.0 (5.0 with --aggressive)]", default=None)
     parser.add_argument("-bc", "--badchantol", type=float, dest="badchantol", help="Fraction of bad channels threshold [default = 0.95 (0.8 with --aggressive)]", default=None)
