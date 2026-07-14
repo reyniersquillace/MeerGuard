@@ -99,7 +99,8 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
 @click.option("-i", "--iterations", "iterations", type=int, default=1,
               help="Number of iterations to run the surgical cleaner [default = 1]")
 @click.option("-C", "--config", "config_path", type=str, default=None,
-              help="Custom config file for misbehaving receivers.")
+              help="Custom config file for misbehaving receivers. Inputting UHF or L will"
+              "automatically load the MeerKAT config files for those receivers.")
 
 def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
          badsubtol, output_name, extension, plot, output_path, aggressive, iterations,
@@ -144,6 +145,11 @@ def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
 
     #grab custom config values if sent in with -C 
     if config_path is not None:
+
+        if config_path in ('UHF', 'uhf', 'U'):
+            config_path = os.path.join(config.base_config_dir, 'receivers', 'UHF_4K_MeerKAT.cfg')
+        elif config_path in ('L', 'Lband', 'L-band'):
+            config_path = os.path.join(config.base_config_dir, 'receivers', 'L-band_4K_MeerKAT.cfg')
         config_overrides = config.read_file(config_path, required=True)
         cfg_obj = config.cfg.get()
         for key, val in config_overrides.items():

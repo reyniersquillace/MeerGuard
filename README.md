@@ -16,6 +16,7 @@ The MeerGuard pipeline needs at least three options to run: the archive file to 
 Example usage:
 
 ```
-python clean_archive.py -a my_archive_file.rf -T my_template_file.rf -o my_clean_file.mg -O ./path/to/dir
+python clean_archive.py -a my_archive_file.rf -T my_template_file.rf -o my_clean_file.mg -O ./dir/path
 ```
 
+Check out `examples` for an example MeerKAT UHF archive file and template of J0045-7319 that work with `MeerGuard`. Note that because J0045-7319 is so faint and the file contains only one subintegration, the pulse is not visible in this one file. This is just an example for RFI excision testing!
