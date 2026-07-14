@@ -16,6 +16,6 @@ The MeerGuard pipeline needs at least three options to run: the archive file to 
 Example usage:
 
 ```
-python clean_archive.py -a my_archive_file.rf -t my_template_file.rf -o my_clean_file.mg
+python clean_archive.py -a my_archive_file.rf -T my_template_file.rf -O my_clean_file.mg
 ```
 
