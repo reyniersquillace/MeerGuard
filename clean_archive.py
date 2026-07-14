@@ -13,6 +13,8 @@ from __future__ import (absolute_import, division,
 
 # Import CoastGuard
 from coast_guard import cleaners
+from coast_guard import config
+
 import argparse
 import psrchive as ps
 import os
@@ -41,7 +43,8 @@ def apply_surgical_cleaner(ar, tmp, cthresh=7.0, sthresh=7.0, plot=False, aggres
     print("\t  iterations = {0}".format(iterations))
 
     surgical_cleaner = cleaners.load_cleaner('surgical')
-    surgical_parameters = "chan_numpieces=1,subint_numpieces=1,chanthresh={1},subintthresh={2},template={0},plot={3},aggressive={4},iterations={5}".format(tmp, cthresh, sthresh, plot, aggressive, iterations)
+    #avoid hard-coding receiver config
+    surgical_parameters = "chanthresh={1},subintthresh={2},template={0},plot={3},aggressive={4},iterations={5}".format(tmp, cthresh, sthresh, plot, aggressive, iterations)
     surgical_cleaner.parse_config_string(surgical_parameters)
     surgical_cleaner.run(ar)
 
@@ -95,9 +98,12 @@ def apply_bandwagon_cleaner(ar, badchantol=0.95, badsubtol=0.95):
               help="Whether to use more aggressive cleaning thresholds and algorithms")
 @click.option("-i", "--iterations", "iterations", type=int, default=1,
               help="Number of iterations to run the surgical cleaner [default = 1]")
+@click.option("-C", "--config", "config_path", type=str, default=None,
+              help="Custom config file for misbehaving receivers.")
 
 def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
-         badsubtol, output_name, extension, plot, output_path, aggressive, iterations):
+         badsubtol, output_name, extension, plot, output_path, aggressive, iterations,
+         config_path):
     
     #raise error if user tries to write multiple input files to one output name
     #have to use extension for that option
@@ -136,12 +142,16 @@ def main(archive_paths, template_path, chan_thresh, subint_thresh, badchantol,
     if badsubtol is None:
         badsubtol = threshold_defaults['badsubtol']
 
+    #grab custom config values if sent in with -C 
+    if config_path is not None:
+        config_overrides = config.read_file(config_path, required=True)
+        cfg_obj = config.cfg.get()
+        for key, val in config_overrides.items():
+            cfg_obj.set_override_config(key, val)
+
     for archive_path in archive_paths:
         print("Processing archive: {0}".format(archive_path))
 
-        #make sure we load the per-receiver config file if it exists
-        arf = utils.ArchiveFile(archive_path)
-        config.cfg.load_configs_for_archive(arf)
 
         # Load an Archive file
         loaded_archive = ps.Archive_load(archive_path)
