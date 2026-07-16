@@ -8,7 +8,6 @@ Patrick Lazarus, August 28th, 2009
 """
 
 import optparse
-import types
 
 from coast_guard import config
 
@@ -85,7 +84,7 @@ def cset(preset=None, fg='default', bg='default', **attr):
         
         if fg in fg_colours:
             fg_val = fg_colours[fg]
-        elif type(fg) == types.IntType or fg.isdigit():
+        elif type(fg) == int or fg.isdigit():
             fg_val = str(fg)
         else:
             print("Unrecognized foreground colour:", fg)
@@ -93,7 +92,7 @@ def cset(preset=None, fg='default', bg='default', **attr):
             
         if bg in bg_colours:
             bg_val = bg_colours[bg]
-        elif type(bg) == types.IntType or bg.isdigit():
+        elif type(bg) == int or bg.isdigit():
             bg_val = str(bg)
         else:
             print("Unrecognized background colour:", bg)
@@ -149,14 +148,6 @@ def cprint(s, *override, **kwoverride):
     print(cstring(s, *override, **kwoverride))
 
 
-def show_dictionary():
-    raise NotImplementedError("colours.show_dictionary needs to be implemented")
-
-
-def show_colours():
-    raise NotImplementedError("colours.show_colours needs to be implemented")
-
-
 def show_status():
     """Display status of colours module.
         Print global variables.
@@ -177,23 +168,8 @@ def parse_attributes(option, opt_str, value, parser):
     parser.values.attributes[value] = True
 
 
-class ColourizedOutput(object):
-    """A 'file' wrapper class that colourizes its output.
-    """
-    def __init__(self, fileobject, *cargs, **ckwargs):
-        self.fileobject = fileobject
-        self.cargs = cargs
-        self.ckwargs = ckwargs
-
-    def __getattr__(self, name):
-        return getattr(self.fileobject, name)
-
-    def write(self, s):
-        print("Writing")
-        self.fileobject.write(colour.cstring(s), *cargs, **ckwargs)
-
-
 def main():
+    """Print the command-line arguments using the requested colours."""
     # String to print is left over command line arguments
     s = " ".join(args)
     cprint(s, preset=options.preset, fg=options.fg, bg=options.bg, \

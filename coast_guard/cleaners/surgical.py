@@ -1,3 +1,10 @@
+"""
+The 'surgical' cleaner (surgical scrub).
+
+De-weights individual profiles (sub-int/channel cells) whose off-pulse
+residuals stand out relative to others in the same channel or sub-int,
+after removing a (optionally supplied) template profile.
+"""
 import numpy as np
 from coast_guard import config
 from coast_guard import cleaners
@@ -11,12 +18,17 @@ from scipy.signal import savgol_filter
 import psrchive
 
 class SurgicalScrubCleaner(cleaners.BaseCleaner):
+    """Cleaner that de-weights outlier profiles using multiple statistics.
+    """
     name = 'surgical'
     description = 'De-weight profiles that stand out compared to others ' \
                     'in the same subint/channel using multiple stats.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'surgical_default_params' config.
+        """
         self.configs.add_param('chanthresh', config_types.FloatVal, \
                          aliases=['cthresh'], \
                          help='The threshold (in number of sigmas) a ' \
@@ -84,7 +96,11 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
         self.configs.add_param('aggressive', config_types.BoolVal,
                                aliases=['aggressive'],
                                nullable=True,
-                               help="Whether to use more aggressive cleaning thresholds and algorithms (chanthresh=5.0, subint_thresh=5.0, badchantol=0.8, badsubtol=0.8)")
+                               help="Whether to use more aggressive cleaning algorithms. When True, "
+                                    "RFI is flagged by the maximum of the diagnostic tests rather "
+                                    "than their average. The accompanying aggressive thresholds "
+                                    "(chanthresh=5.0, subintthresh=5.0, badchantol=0.8, badsubtol=0.8) "
+                                    "are wired in by clean_archive.py unless overridden on the command line.")
         self.configs.add_param('iterations', config_types.IntVal,
                                aliases=['iterations', 'iter'],
                                nullable=True,
@@ -93,28 +109,39 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """Surgically scrub RFI from 'ar' in-place.
+
+            For each iteration: clone and pre-process the archive, remove a
+            template profile (self-derived or from a supplied template file),
+            compute robust per-cell statistics over the off-pulse residuals,
+            and zero-weight the sub-int/channel cells flagged as RFI on the
+            original archive.
+
+            Input:
+                ar: The archive object to clean.
+
+            Outputs:
+                None - The archive is cleaned in-place.
+        """
+        # 'plot' always has a default (plot=None in surgical_default_params),
+        # so determine it once, before the iteration loop.
+        if self.configs.plot is None:
+            plot = False
+        else:
+            plot = self.configs.plot
+
+        if plot:
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib
+                matplotlib.use('Agg')  # use non-interactive backend
+            except Exception as e:
+                print(e)
+                print("MeerGuard failed to import matplotlib: Diagnostic plotting unavailable")
+                plot = False
 
         for ii in range(self.configs.iterations):
             print("Surgical cleaner iteration {0}".format(ii+1))
-
-            try:        
-                if self.configs.plot is None:
-                    plot = False
-                else:
-                    plot = self.configs.plot
-            except KeyError:
-                print("Plot keyword not found. Plotting disabled")
-                plot = False
-
-            if plot:
-                try:
-                    import matplotlib.pyplot as plt
-                    import matplotlib
-                    matplotlib.use('Agg')  # use non-interactive backend
-                except Exception as e:
-                    print(e)
-                    print("MeerGuard failed to import matplotlib: Diagnostic plotting unavailable")
-                    plot = False
 
             patient = ar.clone()
             patient.pscrunch()
@@ -179,7 +206,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             weights = patient.get_weights()
             # Get data (select first polarization - recall we already P-scrunched)
             data = patient.get_data()[:,0,:,:]
-            weights[(data[:,:,0] == 0)] = 0  # Make sure that any zeroed data is masked
+            weights[~data.any(axis=2)] = 0  # Make sure that any fully-zeroed profile is masked
             data = clean_utils.apply_weights(data, weights)
             if plot:
                 preop_data = preop_patient.get_data()[:,0,:,:]
@@ -223,8 +250,8 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             for ii in range(0, np.shape(data)[0]):
                 for jj in range(0, np.shape(data)[1]):
                     if data.mask[ii, jj, :].any():
-                        # Mask all
-                        data.mask[ii, jj, :] = True*np.shape(masked_template.mask)
+                        # Mask all bins in this profile
+                        data.mask[ii, jj, :] = True
                         continue
                     data.mask[ii, jj, :] = masked_template.mask
             if plot:
@@ -265,7 +292,5 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 # not the clone we've been working with.
                 integ = ar.get_Integration(int(isub))
                 integ.set_weight(int(ichan), 0.0)
-            
-            #freq_fraczap = clean_utils.freq_fraczap(ar)
 
 Cleaner = SurgicalScrubCleaner

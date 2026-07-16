@@ -1,4 +1,10 @@
-import types
+"""
+The 'rcvrstd' cleaner.
+
+Prunes and tidies the observing band by pruning to the receiver's response,
+trimming band edges, and de-weighting user-specified bad sub-ints, channels
+and frequency ranges.
+"""
 import numpy as np
 from coast_guard import config
 from coast_guard import cleaners
@@ -8,12 +14,17 @@ from coast_guard import utils
 
 
 class ReceiverBandCleaner(cleaners.BaseCleaner):
+    """Cleaner that prunes/trims the band and removes known-bad data.
+    """
     name = 'rcvrstd'
     description = 'Prune, and tidy the observing band by trimming edges, ' \
                   'and removing bad channels/frequency ranges.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'rcvrstd_default_params' config.
+        """
         self.configs.add_param('response', config_types.FloatPair,
                                aliases=['resp'],
                                nullable=True,
@@ -49,6 +60,9 @@ class ReceiverBandCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """Prune the band, trim edge channels, and remove bad
+            channels/sub-ints from 'ar' in-place.
+        """
         self.__prune_band_edges(ar)
         self.__trim_edge_channels(ar)
         self.__remove_bad_channels(ar)
@@ -122,7 +136,7 @@ class ReceiverBandCleaner(cleaners.BaseCleaner):
         """
         if self.configs.badsubints:
             for tozap in self.configs.badsubints:
-                if type(tozap) is types.IntType:
+                if type(tozap) is int:
                     clean_utils.zero_weight_subint(ar, tozap)
                 else:
                     losubint, hisubint = tozap
@@ -144,14 +158,14 @@ class ReceiverBandCleaner(cleaners.BaseCleaner):
         if self.configs.badchans:
             nremoved = 0
             for tozap in self.configs.badchans:
-                if type(tozap) is types.IntType:
+                if type(tozap) is int:
                     # A single bad channel to zap
                     clean_utils.zero_weight_chan(ar, tozap)
                     nremoved += 1
                 else:
                     # An (inclusive) interval of bad channels to zap
                     lochan, hichan = tozap
-                    for xx in range(lochan, hichan):
+                    for xx in range(lochan, hichan + 1):
                         clean_utils.zero_weight_chan(ar, xx)
                         nremoved += 1
         if self.configs.badfreqs:
@@ -168,7 +182,7 @@ class ReceiverBandCleaner(cleaners.BaseCleaner):
                 hifreqs[ichan] = ctr + chanbw / 2.0
 
             for tozap in self.configs.badfreqs:
-                if type(tozap) is types.FloatType:
+                if type(tozap) is float:
                     # A single bad freq to zap
                     for ichan in np.argwhere((lofreqs <= tozap) & (hifreqs > tozap)):
                         ichan = ichan.squeeze()

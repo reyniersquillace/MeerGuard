@@ -1,3 +1,9 @@
+"""
+The 'bandwagon' cleaner.
+
+Completely de-weights whole sub-ints or channels once the fraction of
+already-masked profiles they contain exceeds a tolerance.
+"""
 import numpy as np
 from coast_guard import config
 from coast_guard import cleaners
@@ -7,12 +13,17 @@ from coast_guard import utils
 
 
 class BandwagonCleaner(cleaners.BaseCleaner):
+    """Cleaner that masks mostly-masked sub-ints/channels entirely.
+    """
     name = 'bandwagon'
     description = 'De-weight profiles from subints/channels where most of ' \
                   'the profiles are already masked.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'bandwagon_default_params' config.
+        """
         self.configs.add_param('badchantol', config_types.FloatVal, \
                                help='The fraction (0 to 1) of bad channels that ' \
                                     'can be tolerated before a sub-int is completely ' \
@@ -25,6 +36,18 @@ class BandwagonCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """De-weight sub-ints/channels that are mostly masked, in-place.
+
+            Sub-ints whose bad-channel fraction exceeds 'badchantol' and
+            channels whose bad-sub-int fraction exceeds 'badsubtol' are
+            zero-weighted.
+
+            Input:
+                ar: The archive object to clean.
+
+            Outputs:
+                None - The archive is cleaned in-place.
+        """
         nchan = ar.get_nchan()
         nsub = ar.get_nsubint()
         weights = (ar.get_weights() > 0)
@@ -32,16 +55,26 @@ class BandwagonCleaner(cleaners.BaseCleaner):
         nchan_masked = np.sum(weights.sum(axis=0)==0)
         nsub_masked = np.sum(weights.sum(axis=1)==0)
 
-        sub_badfrac = 1-weights.sum(axis=1)/float(nchan-nchan_masked)
-        chan_badfrac = 1-weights.sum(axis=0)/float(nsub-nsub_masked)
+        # Number of not-fully-masked channels/sub-ints. These are the
+        # denominators for the bad-fraction calculations below. Guard against
+        # a fully-masked archive (every channel or every sub-int already
+        # masked), which would otherwise divide by zero and produce inf/nan.
+        nchan_good = nchan - nchan_masked
+        nsub_good = nsub - nsub_masked
 
-        sub_is_bad = np.argwhere(sub_badfrac>self.configs.badchantol)
-        for isub in sub_is_bad:
-            clean_utils.zero_weight_subint(ar, isub)
+        if nchan_good > 0:
+            sub_badfrac = 1-weights.sum(axis=1)/float(nchan_good)
+            #numpy2-safe:
+            sub_is_bad = np.flatnonzero(sub_badfrac>self.configs.badchantol)
+            for isub in sub_is_bad:
+                clean_utils.zero_weight_subint(ar, isub)
 
-        chan_is_bad = np.argwhere(chan_badfrac>self.configs.badsubtol)
-        for ichan in chan_is_bad:
-            clean_utils.zero_weight_chan(ar, ichan)
+        if nsub_good > 0:
+            chan_badfrac = 1-weights.sum(axis=0)/float(nsub_good)
+            #numpy2-safe:
+            chan_is_bad = np.flatnonzero(chan_badfrac>self.configs.badsubtol)
+            for ichan in chan_is_bad:
+                clean_utils.zero_weight_chan(ar, ichan)
 
 
 Cleaner = BandwagonCleaner

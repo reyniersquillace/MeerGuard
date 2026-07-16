@@ -1,17 +1,29 @@
+"""
+The 'hotbins' cleaner.
+
+Replaces profile phase-bins that are significantly brighter than the
+off-pulse profile average with white noise.
+"""
 import numpy as np
 from coast_guard import config
 from coast_guard import cleaners
 from coast_guard.cleaners import config_types
 from coast_guard import utils
+from coast_guard import errors
 
 
 class HotbinsCleaner(cleaners.BaseCleaner):
+    """Cleaner that replaces 'hot' profile bins with white noise.
+    """
     name = 'hotbins'
     description = 'Replace profile bins that are significantly brighter ' \
                     'than the profile average with white noise.'
 
 
     def _set_config_params(self):
+        """Define the configurable parameters for this cleaner and set
+            them to the values from the 'hotbins_default_params' config.
+        """
         self.configs.add_param('threshold', config_types.FloatVal, \
                                aliases=['thresh'], \
                                help='The threshold (in number of sigmas) for a ' \
@@ -41,12 +53,24 @@ class HotbinsCleaner(cleaners.BaseCleaner):
 
 
     def _clean(self, ar):
+        """Find and replace hot bins in 'ar' in-place.
+
+            Builds a p-scrunched reference (optionally f-/t-scrunched),
+            determines the off-pulse region (or the on/off-cal regions for
+            calibrator scans), and replaces hot bins with white noise.
+
+            Input:
+                ar: The archive object to clean.
+
+            Outputs:
+                None - The archive is cleaned in-place.
+        """
         reference = ar.clone()
         reference.pscrunch()
         if self.configs.fscrunchfirst:
             if ar.get_dedispersed():
-                raise errors.CleanError('The "hotbins" cleaner "fscrunchfirst"' \
-                                        'an only be used on non-dedispersed data.')
+                raise errors.CleanError('The "hotbins" cleaner "fscrunchfirst" ' \
+                                        'can only be used on non-dedispersed data.')
             reference.set_dispersion_measure(0)
             reference.fscrunch()
         if self.configs.tscrunchfirst:
@@ -66,6 +90,23 @@ class HotbinsCleaner(cleaners.BaseCleaner):
 
 
     def __find_and_replace_hotbins(self, ar, reference, offbins):
+        """Identify hot bins in 'reference' and replace them in 'ar'.
+
+            For each profile, bins in the 'offbins' region that deviate
+            from the off-pulse median by more than 'threshold' sigma
+            (estimated robustly via the MAD) are replaced with Gaussian
+            noise matched to the good off-pulse data.
+
+            Inputs:
+                ar: The archive whose bins are replaced (modified in-place).
+                reference: The (pre-processed) reference archive used to
+                    detect hot bins.
+                offbins: A boolean array (length nbin) that is True for the
+                    off-pulse bins to consider.
+
+            Outputs:
+                None
+        """
         nbins = ar.get_nbin()
         indices = np.arange(nbins)
         offbin_indices = indices[offbins]
@@ -111,6 +152,9 @@ class HotbinsCleaner(cleaners.BaseCleaner):
 
 
     def __locate_cal(self, ar):
+        """Return a boolean array marking the phase bins containing the
+            cal signal, using the configured 'calfrac' duty cycle.
+        """
         return utils.locate_cal(ar, calfrac=self.configs.calfrac)
 
 

@@ -1,3 +1,11 @@
+"""
+Configuration handling for CoastGuard/MeerGuard.
+
+Reads configuration values from '.cfg' files (which are executed as Python)
+and exposes them via a layered lookup (overrides, observation configs and
+defaults). A thread-/process-aware manager (`cfg`) hands out per-process
+configuration objects.
+"""
 import sys
 import copy
 import os
@@ -13,12 +21,22 @@ with open(os.path.join(base_config_dir, "global.cfg")) as f:
     exec(code, {}, locals())
 
 class ConfigDict(dict):
+    """A dictionary of configuration values.
+
+        Supports combining two configurations with '+' (returning a new
+        dict where the right operand's values take precedence) and a
+        readable string representation.
+    """
     def __add__(self, other):
+        """Return a new ConfigDict combining self with 'other'.
+            Values in 'other' override those in self.
+        """
         newcfg = copy.deepcopy(self)
         newcfg.update(other)
         return newcfg
 
     def __str__(self):
+        """Return the configurations as sorted 'key: value' lines."""
         lines = []
         for key in sorted(self.keys()):
             lines.append("%s: %r" % (key, self[key]))
@@ -26,6 +44,20 @@ class ConfigDict(dict):
 
 
 def read_file(fn, required=False):
+    """Read a configuration file and return its contents.
+
+        The file (which must end in '.cfg') is executed as Python and any
+        names it defines become configuration entries.
+
+        Inputs:
+            fn: The path to the configuration file.
+            required: If True, raise ValueError when the file is missing.
+                (Default: False)
+
+        Output:
+            cfgdict: A ConfigDict of the values defined in the file
+                (empty if the file does not exist and is not required).
+    """
     cfgdict = ConfigDict()
     if os.path.isfile(fn):
         if not fn.endswith('.cfg'):
@@ -45,7 +77,18 @@ def read_file(fn, required=False):
 
 
 class CoastGuardConfigs(object):
+    """A layered set of CoastGuard configurations.
+
+        Values are looked up in order of precedence: user overrides,
+        observation-specific configs, then defaults.
+    """
     def __init__(self, base_config_dir=base_config_dir):
+        """Load the default configurations from 'base_config_dir'.
+
+            Input:
+                base_config_dir: Directory containing the configuration
+                    files (must contain 'default.cfg').
+        """
         self.base_config_dir = base_config_dir
         default_config_fn = os.path.join(self.base_config_dir, "default.cfg")
 
@@ -54,9 +97,13 @@ class CoastGuardConfigs(object):
         self.overrides = ConfigDict()
 
     def __getattr__(self, key):
+        """Look up configuration 'key' via attribute access."""
         return self.__getitem__(key)
 
     def __getitem__(self, key):
+        """Return the value for 'key', respecting the precedence order.
+            Exits the program if the key cannot be found.
+        """
         if key in self.overrides:
             val = self.overrides[key]
         elif key in self.obsconfigs:
@@ -69,6 +116,7 @@ class CoastGuardConfigs(object):
         return val
 
     def __str__(self):
+        """Return a human-readable summary of all configuration layers."""
         allkeys = set.union(set(self.defaults.keys()),
                             set(self.obsconfigs.keys()),
                             set(self.overrides.keys()))
@@ -85,12 +133,15 @@ class CoastGuardConfigs(object):
         return "\n".join(lines)
 
     def clear_obsconfigs(self):
+        """Clear all observation-specific configurations."""
         self.obsconfigs.clear()
 
     def clear_overrides(self):
+        """Clear all override configurations."""
         self.overrides.clear()
 
     def set_override_config(self, key, val):
+        """Set an override configuration value for 'key' to 'val'."""
         self.overrides[key] = val
 
     def load_configs_for_archive(self, arfn):
@@ -143,21 +194,28 @@ class ConfigManager(object):
     """
 
     def __init__(self):
+        """Create an empty manager (keyed by process ID)."""
         self.configs = {}
 
     def __contains__(self, name):
+        """Return True if a config object exists for 'name' (a PID)."""
         return name in self.configs
 
     def get(self):
+        """Return the CoastGuardConfigs object for the current process,
+            creating one if necessary.
+        """
         name = os.getpid()
         if name not in self:
             self.configs[name] = CoastGuardConfigs()
         return self.configs[name]
 
     def load_configs_for_archive(self, arf):
+        """Load observation configs for 'arf' into this process's configs."""
         self.get().load_configs_for_archive(arf)
 
     def __getattr__(self, key):
+        """Look up configuration 'key' for the current process."""
         val = self.get()[key]
         return val
 
@@ -166,7 +224,8 @@ cfg = ConfigManager()
 
 
 def main():
-    import utils
+    """Command-line demo: load and print configs for an archive."""
+    from coast_guard import utils
     if len(sys.argv) > 1:
         arf = utils.ArchiveFile(sys.argv[1])
         cfg.set_override_config("something", 'newvalue!')

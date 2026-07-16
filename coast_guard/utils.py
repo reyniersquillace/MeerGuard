@@ -12,11 +12,9 @@ import glob
 import optparse
 import sys
 import subprocess
-import types
 import inspect
 import datetime
 import argparse
-import string
 import tempfile
 import stat
 
@@ -243,6 +241,14 @@ __fluxcals = None
 __psrchive_configs = None
 
 def get_psrchive_configs():
+    """Return PSRCHIVE's configuration settings as a dictionary.
+
+        The output of the 'psrchive_config' command is parsed once and
+        cached for subsequent calls.
+
+        Output:
+            configs: A dict of PSRCHIVE configuration key/value strings.
+    """
     global __psrchive_configs
     if __psrchive_configs is None:
         __psrchive_configs = {}
@@ -438,7 +444,7 @@ def normalise_parfile(par):
         Output:
             parfn: Name of (temporary) parfile.
     """
-    if isinstance(par, types.StringTypes):
+    if isinstance(par, str):
         # Assume input is
         if os.path.isfile(par):
             # Assume input is par filename
@@ -686,6 +692,15 @@ def get_archive_snr(fn):
 
 
 def exclude_files(file_list, to_exclude):
+    """Return the entries of 'file_list' that are not in 'to_exclude'.
+
+        Inputs:
+            file_list: The list of files to filter.
+            to_exclude: The files to remove from 'file_list'.
+
+        Output:
+            filtered: The filtered list of files.
+    """
     return [f for f in file_list if f not in to_exclude]
 
 
@@ -707,15 +722,15 @@ def execute(cmd, stdout=subprocess.PIPE, stderr=sys.stderr, dir=None):
 
     stdoutfile = False
     stderrfile = False
-    if type(stdout) == types.StringType:
+    if type(stdout) == str:
         stdout = open(stdout, 'w')
         stdoutfile = True
-    if type(stderr) == types.StringType:
+    if type(stderr) == str:
         stderr = open(stderr, 'w')
         stderrfile = True
-    
+
     # Run (and time) the command. Check for errors.
-    if type(cmd) == types.StringType:
+    if type(cmd) == str:
         shell=True
     else:
         shell=False
@@ -849,6 +864,15 @@ def enforce_file_consistency(infns, param, expected=None, discard=False, warn=Fa
 
 
 def get_mode(vals):
+    """Return the most common value in 'vals' and its count.
+
+        Input:
+            vals: A list of values.
+
+        Outputs:
+            mode: The most frequently occurring value.
+            count: The number of times it occurs.
+    """
     counts = {}
     for val in vals:
         count = counts.setdefault(val, 0)
@@ -1269,7 +1293,7 @@ def sort_by_keys(tosort, keys):
         else:
             rev = False
             print_info("Sorting by %s..." % sortkey, 2)
-        if type(tosort[0][sortkey]) is types.StringType:
+        if type(tosort[0][sortkey]) is str:
             tosort.sort(key=lambda x: x[sortkey].lower(), reverse=rev)
         else:
             tosort.sort(key=lambda x: x[sortkey], reverse=rev)
@@ -1279,6 +1303,17 @@ PERMS = {"w": stat.S_IWGRP,
          "r": stat.S_IRGRP,
          "x": stat.S_IXGRP}
 def add_group_permissions(fn, perms=""):
+    """Add group-level file permissions to a file.
+
+        Inputs:
+            fn: The name of the file to modify.
+            perms: A string of permission characters to add for the
+                group. Any of 'w' (write), 'r' (read) and 'x' (execute).
+                (Default: add no permissions)
+
+        Outputs:
+            None
+    """
     mode = os.stat(fn)[stat.ST_MODE]
     for perm in perms:
         mode |= PERMS[perm]
@@ -1286,7 +1321,21 @@ def add_group_permissions(fn, perms=""):
 
 
 class ArchiveFile(object):
+    """A lightweight wrapper around a PSRCHIVE archive file.
+
+        Reads a set of header parameters (via 'vap') on creation, derives
+        some convenience values (e.g. preferred pulsar name, observing
+        band, coordinates), and provides dictionary-style access to header
+        values as well as lazy loading of the underlying archive.
+    """
     def __init__(self, fn):
+        """Create an ArchiveFile for the file 'fn'.
+
+            Reads header values and computes derived quantities.
+
+            Input:
+                fn: The path to the archive file.
+        """
         self.fn = str(os.path.abspath(fn)) # Cast to string in case fn is unicode
         self.ar = None
         if not os.path.isfile(self.fn):
@@ -1328,12 +1377,25 @@ class ArchiveFile(object):
         self.hdr['coords'] = "%s%s" % (rastr, decstr)
 
     def __getitem__(self, key):
+        """Return the header value for 'key'.
+
+            Values are fetched lazily (via 'vap') and cached if not already
+            known. A '_L'/'_U' suffix lower-/upper-cases the result, and a
+            'date:<fmt>' key formats the observation datetime. 'snr' is
+            computed on demand.
+
+            Input:
+                key: The header parameter (or special key) to look up.
+
+            Output:
+                val: The (optionally filtered) header value.
+        """
         filterfunc = lambda x: x # A do-nothing filter
         if (type(key) in (type('str'), type(u'str'))) and key.endswith("_L"):
-            filterfunc = string.lower
+            filterfunc = str.lower
             key = key[:-2]
         elif (type(key) in (type('str'), type(u'str'))) and key.endswith("_U"):
-            filterfunc = string.upper
+            filterfunc = str.upper
             key = key[:-2]
         if key not in self.hdr:
             if key == 'snr':
@@ -1354,12 +1416,20 @@ class ArchiveFile(object):
         return filterfunc(val)
     
     def get_archive(self):
+        """Return the underlying psrchive Archive object, loading it
+            (and caching it) on first access.
+        """
         if self.ar is None:
             import psrchive
             self.ar = psrchive.Archive_load(self.fn)
         return self.ar
 
     def get_usable_bw(self):
+        """Return the usable bandwidth (MHz) of the archive.
+
+            The usable bandwidth is the total bandwidth scaled by the
+            fraction of channels that contain non-zero (unmasked) data.
+        """
         ar = self.get_archive()
         clone = ar.clone()
         clone.pscrunch()
@@ -1371,10 +1441,15 @@ class ArchiveFile(object):
 
 
 class DefaultOptions(optparse.OptionParser):
+    """An optparse.OptionParser that adds standard and debug option groups
+        (shared across CoastGuard programs) just before parsing.
+    """
     def __init__(self, *args, **kwargs):
+        """Create the option parser (see optparse.OptionParser)."""
         optparse.OptionParser.__init__(self, *args, **kwargs)
 
     def parse_args(self, *args, **kwargs):
+        """Add the standard/debug option groups, then parse arguments."""
         # Add debug group just before parsing so it is the last set of
         # options displayed in help text
         self.add_standard_group()
@@ -1382,6 +1457,7 @@ class DefaultOptions(optparse.OptionParser):
         return optparse.OptionParser.parse_args(self, *args, **kwargs)
 
     def add_standard_group(self):
+        """Add the group of standard options (verbosity, colour, etc.)."""
         group = optparse.OptionGroup(self, "Standard Options", \
                     "The following options are used to set standard " \
                     "behaviour shared by multiple modules.")
@@ -1412,6 +1488,7 @@ class DefaultOptions(optparse.OptionParser):
         self.add_option_group(group)
 
     def add_debug_group(self):
+        """Add the group of debugging options."""
         group = optparse.OptionGroup(self, "Debug Options", \
                     "The following options turn on various debugging " \
                     "statements. Multiple debugging options can be " \
@@ -1440,33 +1517,42 @@ class DefaultOptions(optparse.OptionParser):
         self.add_option_group(group)
 
     def increment_config(self, option, opt_str, value, parser, param):
+        """optparse callback: increment the named config value by 1."""
         val = getattr(config, param)
         setattr(config, param, val+1)
 
     def decrement_config(self, option, opt_str, value, parser, param):
+        """optparse callback: decrement the named config value by 1."""
         val = getattr(config, param)
         setattr(config, param, val-1)
 
     def toggle_config(self, option, opt_str, value, parser, param):
+        """optparse callback: toggle the named boolean config value."""
         val = getattr(config, param)
         setattr(config, param, not val)
 
     def override_config(self, option, opt_str, value, parser):
+        """optparse callback: set an override config to the given value."""
         config.cfg.set_override_config(option.dest, value)
 
     def set_override_config(self, option, opt_str, value, parser):
+        """optparse callback: set an override config to True."""
         config.cfg.set_override_config(option.dest, True)
 
     def unset_override_config(self, option, opt_str, value, parser):
+        """optparse callback: set an override config to False."""
         config.cfg.set_override_config(option.dest, False)
-    
+
     def debug_callback(self, option, opt_str, value, parser):
+        """optparse callback: turn on the named debugging mode."""
         config.debug.set_mode_on(value)
 
     def debugall_callback(self, option, opt_str, value, parser):
+        """optparse callback: turn on all debugging modes."""
         config.debug.set_allmodes_on()
 
     def list_debug(self, options, opt_str, value, parser):
+        """optparse callback: list all debugging modes, then exit."""
         print("Available debugging modes:")
         for name, desc in config.debug.modes:
             print("    {0}: {1}".format(name, desc))
@@ -1474,13 +1560,21 @@ class DefaultOptions(optparse.OptionParser):
 
 
 class DefaultArguments(argparse.ArgumentParser):
+    """An argparse.ArgumentParser that adds standard, debug and file-
+        selection argument groups (shared across CoastGuard programs) and
+        applies the requested warning mode after parsing.
+    """
     def __init__(self, *args, **kwargs):
+        """Create the argument parser (see argparse.ArgumentParser)."""
         self.added_std_group = False
         self.added_debug_group = False
         self.added_file_group = False
         argparse.ArgumentParser.__init__(self, *args, **kwargs)
 
     def parse_args(self, *args, **kwargs):
+        """Add the standard/debug groups (unless using subparsers), parse
+            the arguments, and set the warning mode.
+        """
         if not self._subparsers:
             # Add default groups just before parsing so it is the last set of
             # options displayed in help text
@@ -1492,6 +1586,7 @@ class DefaultArguments(argparse.ArgumentParser):
         return args
 
     def add_file_selection_group(self):
+        """Add the group of file-selection options (glob/exclude)."""
         if self.added_file_group:
             # Already added file selection group
             return
@@ -1519,6 +1614,7 @@ class DefaultArguments(argparse.ArgumentParser):
         self.added_file_group = True
 
     def add_standard_group(self):
+        """Add the group of standard options (verbosity, colour, etc.)."""
         if self.added_std_group:
             # Already added standard group
             return
@@ -1562,6 +1658,7 @@ class DefaultArguments(argparse.ArgumentParser):
         self.added_std_group = True
 
     def add_debug_group(self):
+        """Add the group of debugging options."""
         if self.added_debug_group:
             # Debug group has already been added
             return
@@ -1593,30 +1690,37 @@ class DefaultArguments(argparse.ArgumentParser):
         self.added_debug_group = True
 
     class TurnUpVerbosity(argparse.Action):
+        """argparse action: increase the verbosity level by 1."""
         def __call__(self, parser, namespace, values, option_string):
             config.verbosity += 1
 
     class TurnDownVerbosity(argparse.Action):
+        """argparse action: decrease the verbosity level by 1."""
         def __call__(self, parser, namespace, values, option_string):
             config.verbosity -= 1
- 
+
     class SetVerbosity(argparse.Action):
+        """argparse action: set the verbosity level to the given value."""
         def __call__(self, parser, namespace, values, option_string):
             config.verbosity = values[0]
 
     class SetLogVerbosity(argparse.Action):
+        """argparse action: set the logging verbosity to the given value."""
         def __call__(self, parser, namespace, values, option_string):
             config.log_verbosity = values[0]
 
-    class SetDebugMode(argparse.Action): 
+    class SetDebugMode(argparse.Action):
+        """argparse action: turn on the named debugging mode."""
         def __call__(self, parser, namespace, values, option_string):
             config.debug.set_mode_on(values[0])
 
-    class SetAllDebugModes(argparse.Action): 
+    class SetAllDebugModes(argparse.Action):
+        """argparse action: turn on all debugging modes."""
         def __call__(self, parser, namespace, values, option_string):
             config.debug.set_allmodes_on()
 
-    class ListDebugModes(argparse.Action): 
+    class ListDebugModes(argparse.Action):
+        """argparse action: list all debugging modes, then exit."""
         def __call__(self, parser, namespace, values, option_string):
             print("Available debugging modes:")
             for name, desc in config.debug.modes:
@@ -1626,23 +1730,32 @@ class DefaultArguments(argparse.ArgumentParser):
             sys.exit(1)
 
     class ToggleConfigAction(argparse.Action):
+        """argparse action: toggle the boolean config named by 'dest'."""
         def __call__(self, parser, namespace, values, option_string):
             val = getattr(config, self.dest)
             setattr(config, self.dest, not val)
-    
+
     class OverrideConfigAction(argparse.Action):
+        """argparse action: set an override config (named by 'dest') to
+            the provided value.
+        """
         def __call__(self, parser, namespace, values, option_string):
             config.cfg.set_override_config(self.dest, values)
 
     class SetOverrideConfigAction(argparse.Action):
+        """argparse action: set an override config (named by 'dest') to True."""
         def __call__(self, parser, namespace, values, option_string):
             config.cfg.set_override_config(self.dest, True)
 
     class UnsetOverrideConfigAction(argparse.Action):
+        """argparse action: set an override config (named by 'dest') to False."""
         def __call__(self, parser, namespace, values, option_string):
             config.cfg.set_override_config(self.dest, False)
 
     class GetFilesFromGlobAction(argparse.Action):
+        """argparse action: expand a glob expression and extend the
+            destination list with the matching files.
+        """
         def __call__(self, parser, namespace, values, option_string):
             glob_file_list = getattr(namespace, self.dest)
             glob_file_list.extend(glob.glob(values))

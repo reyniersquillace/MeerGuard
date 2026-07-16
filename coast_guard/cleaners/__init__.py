@@ -1,3 +1,9 @@
+"""
+Cleaner framework for CoastGuard/MeerGuard.
+
+Defines the registry of available cleaners, the base Cleaner class, and the
+Configurations container that parses and normalises cleaner parameters.
+"""
 import textwrap
 from coast_guard import config
 from coast_guard.cleaners import config_types
@@ -39,11 +45,13 @@ class BaseCleaner(object):
 
 
     def __init__(self):
+        """Create the cleaner, initialising its configurable parameters."""
         self.configs = Configurations()
         self._set_config_params()
 
 
     def __repr__(self):
+        """Return a representation showing the cleaner's current params."""
         return '<%s object -- params: %s>' % (self.__class__.__name__, self.configs)
 
 
@@ -104,6 +112,16 @@ class BaseCleaner(object):
 
 
     def get_help(self, full=False):
+        """Return a formatted help string describing the cleaner.
+
+            Input:
+                full: If True, include a description of each configurable
+                    parameter (with type, help text and default/required
+                    status). (Default: False)
+
+            Output:
+                helptext: The formatted help string.
+        """
         helplines = []
         wrapper = textwrap.TextWrapper(subsequent_indent=' ' * (len(self.name) + 4))
         helplines.append('%s -- %s' % (colour.cstring(self.name, bold=True), 
@@ -132,6 +150,14 @@ class BaseCleaner(object):
 
 
     def run(self, ar):
+        """Clean an archive in-place using this cleaner.
+
+            Input:
+                ar: The archive object to clean.
+
+            Outputs:
+                None - The archive is cleaned in-place.
+        """
         utils.print_info('Cleaning %s with %s' % (ar.get_filename(), self.name), 1)
         self._clean(ar)
 
@@ -145,6 +171,11 @@ class Configurations(dict):
 
 
     def __init__(self, *args, **kwargs):
+        """Create an empty configurations container.
+
+            Sets up the bookkeeping dictionaries used to hold normalised
+            configuration strings, parameter types, aliases and help text.
+        """
         super(Configurations, self).__init__(*args, **kwargs)
         self.cfgstrs = {}
         self.types = {} # dictionary where keys are configuration names
@@ -158,11 +189,16 @@ class Configurations(dict):
 
 
     def __str__(self):
+        """Return the normalised configuration string."""
         return self.to_string()
 
 
     def __setitem__(self, key, valstr):
-        key = self.aliases.get(key, key) # Normalise key 
+        """Set configuration 'key' from the string 'valstr'.
+            The key is normalised (aliases resolved) and the value string
+            is cast and stored in normalised form.
+        """
+        key = self.aliases.get(key, key) # Normalise key
                                          # in case an alias was provided
         cfgtype = self.types[key]
         # Save normalized value-string and normalised key pairs
@@ -173,12 +209,14 @@ class Configurations(dict):
 
 
     def __getattr__(self, key):
+        """Return the (casted) value of configuration 'key'."""
         return self[key]
 
 
     def to_string(self):
+        """Return a normalised, sorted '<param>=<val>,...' config string."""
         # Sort to normalise order
-        return ','.join(sorted(['%s=%s' % ii for ii in self.cfgstrs.iteritems()]))
+        return ','.join(sorted(['%s=%s' % ii for ii in self.cfgstrs.items()]))
 
 
     def set_from_string(self, cfgstr):
@@ -197,7 +235,7 @@ class Configurations(dict):
             self[key] = val
 
 
-    def add_param(self, name, cfgtype, default=None, aliases=[], \
+    def add_param(self, name, cfgtype, default=None, aliases=None, \
                   help='', nullable=False):
         """Add a single configuration parameter.
 
@@ -216,6 +254,8 @@ class Configurations(dict):
             Outputs:
                 None - The parameters are created and stored.
         """
+        if aliases is None:
+            aliases = []
         # Check that name and aliases are not already in use
         for key in [name]+aliases:
             if (key in self.types) or (key in self.aliases):

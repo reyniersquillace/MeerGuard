@@ -1,4 +1,9 @@
-import types
+"""
+Configuration type classes for cleaner config-strings.
+
+Each ConfigType knows how to parse a parameter string into a Python value
+and to normalise a value back into a canonical string representation.
+"""
 
 
 class BaseConfigType(object):
@@ -235,7 +240,7 @@ class IntOrIntPairList(BaseConfigType):
     def _value_to_string(self, val):
         strs = []
         for el in val:
-            if type(el) is types.TupleType:
+            if type(el) is tuple:
                 strs.append("%d:%d" % el)
             else:
                 strs.append("%d" % el)
@@ -343,7 +348,7 @@ class FloatOrFloatPairList(BaseConfigType):
     def _value_to_string(self, val):
         strs = []
         for el in val:
-            if type(el) is types.TupleType:
+            if type(el) is tuple:
                 strs.append('%g:%g' % el)
             else:
                 strs.append('%g' % el)
@@ -352,6 +357,8 @@ class FloatOrFloatPairList(BaseConfigType):
 
 
 class StrVal(BaseConfigType):
+    """A configuration type for string values.
+    """
     name = "A string"
     description = "A string"
     def _string_to_value(self, paramstr):
