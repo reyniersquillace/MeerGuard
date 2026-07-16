@@ -164,15 +164,16 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 if len(template_ar.get_frequencies()) > 1 and len(template_ar.get_frequencies()) < len(patient.get_frequencies()):
                     print("Template channel number doesn't match data... f-scrunching!")
                     template_ar.fscrunch()
+                
                 template_data = template_ar.get_data().squeeze()
-                template = np.apply_over_axes(np.sum, template_data, tuple(range(template_data.ndim - 1))).squeeze()
-                # make sure template is 1D
-                if len(np.shape(template)) > 1:  # sum over frequencies too
-                    template_ar.fscrunch()  
-                    print("2D template found. Assuming it has same frequency coverage and channels as data!")
-                    template_phs = np.apply_over_axes(np.sum, template_data, tuple(range(template_data.ndim - 1))).squeeze()
-                else:
-                    template_phs = template
+                print(f'Dimensions of input template: {template_data.shape}')
+                
+                # 1D profile for phase-offset fit and on-pulse masking
+                template_phs = np.apply_over_axes(np.sum, template_data,
+                                                  tuple(range(template_data.ndim - 1))).squeeze()
+                # keep frequency resolution for the per-channel subtraction
+                template = template_data if template_data.ndim > 1 else template_phs
+                
 
             print('Estimating template and profile phase offset')
             if self.configs.template is None:
@@ -186,6 +187,8 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 #err = (lambda (amp, phs, base): amp*clean_utils.fft_rotate(template_phs, phs) + base - profile)
                 #err = lambda amp, phs: amp*clean_utils.fft_rotate(template_phs, phs) - profile
                 err = lambda x: x[0]*clean_utils.fft_rotate(template_phs, x[1]) - profile
+                print(f'Profile median: {np.median(profile)}')
+                print(f'Profile median: {np.median(template_phs)}')
                 amp_guess = np.median(profile)/np.median(template_phs)
                 phase_guess = -(np.argmax(profile) - np.argmax(template_phs))
                 #params, status = leastsq(err, [amp_guess, phase_guess, np.min(profile) - np.min(template_phs)])
@@ -264,7 +267,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             print('Calculating robust statistics to determine where RFI removal is required')
             # RFI-ectomy must be recommended by average of tests, or a single test if aggressive option is used.
             # DJR: The stats are mean, peak-to-peak, standard deviation, and max value of FFT
-
+            
             avg_test_results = clean_utils.comprehensive_stats(data, axis=2, \
                                         chanthresh=self.configs.chanthresh, \
                                         subintthresh=self.configs.subintthresh, \

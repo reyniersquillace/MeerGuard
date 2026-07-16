@@ -433,8 +433,17 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
             params: (only if return_params) The best-fit amplitude(s).
     """
     rotated_template = fft_rotate(template, phs)
-    err = lambda amp: amp*rotated_template - prof
-    params, status = scipy.optimize.leastsq(err, [np.median(prof)/np.median(template)])
+    
+    try:
+        err = lambda amp: amp*rotated_template - prof
+        params, status = scipy.optimize.leastsq(err, [np.median(prof)/np.median(template)])
+    except RuntimeWarning:
+        print(np.median(rotated_template))
+        print(np.nanmedian(rotated_template))
+        print(np.median(prof))
+        print(np.nanmedian(prof))
+        
+    
     #err = lambda (amp, base): amp*rotated_template + base - prof
     #params, status = scipy.optimize.leastsq(err, [max(prof)/max(template),
     #                                              np.min(prof)-np.min(rotated_template)])
