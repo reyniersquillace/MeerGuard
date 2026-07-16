@@ -2,6 +2,31 @@
 Useful utility functions for cleaning a PSRCHIVE archive.
 
 Patrick Lazarus, Feb. 14, 2012
+
+--- PATCH NOTE (local modification, not upstream) ---
+remove_profile1d()'s initial amplitude guess used to be
+np.median(prof)/np.median(template). That's fine when 'template' is a
+single profile summed over many frequency channels (the old behavior),
+but once a genuine per-channel 2D template is fit channel-by-channel (as
+on the 2D_tools branch), each channel's own narrow on-pulse region is a
+small fraction of nbin, so np.median(template) is exactly 0 for nearly
+every channel -- a real, mostly-zero-but-not-degenerate template, not a
+broken one. That produced a silent RuntimeWarning (divide by zero ->
+inf initial guess -> inf*0 = nan written into the archive), which later
+crashed comprehensive_stats()'s polynomial detrending with
+"array must not contain infs or NaNs".
+
+Fixed by:
+  1. Using the closed-form least-squares solution
+     amp = dot(template, prof) / dot(template, template)
+     as the initial guess instead of a median ratio -- this is the exact
+     analytic minimizer for the linear model amp*template ~= prof, and
+     it's well-behaved for sparse/narrow templates.
+  2. Explicitly guarding against a genuinely all-zero template (e.g. a
+     blanked/RFI-zapped/out-of-band channel) by skipping the fit and
+     zero-weighting that profile, the same way a failed fit already is
+     handled -- instead of computing 0/0.
+------------------------------------------------------
 """
 import warnings
 import multiprocessing
@@ -429,24 +454,39 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
         Outputs:
             (isub, ichan): The input indices.
             residual: The profile with the fitted template removed (zeros
-                if the fit failed).
-            params: (only if return_params) The best-fit amplitude(s).
+                if the fit failed, None if the template was degenerate).
+            params: (only if return_params) The best-fit amplitude(s), or
+                None if the template was degenerate.
     """
+    if not np.any(template):
+        # Degenerate (all-zero) template for this channel -- e.g. a
+        # blanked/RFI-zapped/out-of-band channel in a per-channel 2D
+        # template. There's nothing to fit against. Treat this the same
+        # as a failed fit (caller zero-weights it) instead of computing
+        # median(prof)/median(template) = x/0.
+        warnings.warn("All-zero template for (isub=%d, ichan=%d); no fit "
+                            "possible, zero-weighting this profile."
+                            % (isub, ichan), errors.CoastGuardWarning)
+        if return_params:
+            return (isub, ichan), None, None
+        else:
+            return (isub, ichan), None
+
     rotated_template = fft_rotate(template, phs)
-    
-    try:
-        err = lambda amp: amp*rotated_template - prof
-        params, status = scipy.optimize.leastsq(err, [np.median(prof)/np.median(template)])
-    except RuntimeWarning:
-        print(np.median(rotated_template))
-        print(np.nanmedian(rotated_template))
-        print(np.median(prof))
-        print(np.nanmedian(prof))
-        
-    
-    #err = lambda (amp, base): amp*rotated_template + base - prof
-    #params, status = scipy.optimize.leastsq(err, [max(prof)/max(template),
-    #                                              np.min(prof)-np.min(rotated_template)])
+
+    # Closed-form least-squares amplitude for the linear model
+    # amp*rotated_template ~= prof, i.e. the analytic minimizer of
+    # ||amp*rotated_template - prof||^2. This replaces the old
+    # np.median(prof)/np.median(template) initial guess, which divides by
+    # zero whenever the template's on-pulse duty cycle is under 50% of the
+    # profile -- the normal case for a per-channel template whose off-pulse
+    # region has been zeroed, even though the template itself is fine.
+    denom = np.dot(rotated_template, rotated_template)
+    amp_guess = np.dot(rotated_template, prof) / denom
+
+    err = lambda amp: amp*rotated_template - prof
+    params, status = scipy.optimize.leastsq(err, [amp_guess])
+
     if status not in (1,2,3,4):
         warnings.warn("Bad status for least squares fit when " \
                             "removing profile", errors.CoastGuardWarning)
