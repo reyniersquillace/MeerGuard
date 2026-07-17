@@ -4,6 +4,19 @@ The 'surgical' cleaner (surgical scrub).
 De-weights individual profiles (sub-int/channel cells) whose off-pulse
 residuals stand out relative to others in the same channel or sub-int,
 after removing a (optionally supplied) template profile.
+
+--- PATCH NOTE (local modification, not upstream) ---
+Adds a shape check right after the template is loaded: if the squeezed
+template array still has more than 2 dimensions, it means the template
+file was never time-scrunched down to a single representative profile
+(its axis 0 is still sub-integration, not channel). Previously this fell
+through silently and 'template[ichan, :]' downstream in
+clean_utils.remove_profile_inplace() sliced the wrong axis, eventually
+crashing deep inside fft_rotate() with a cryptic
+"operands could not be broadcast together" shape-mismatch error. Now it
+fails immediately with a message that says what's actually wrong and how
+to fix it (pam -Tp).
+------------------------------------------------------
 """
 import numpy as np
 from coast_guard import config
@@ -154,7 +167,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             if self.configs.template is None:
                 # Sum over all axes except last, which is phase bins
                 template = np.apply_over_axes(np.sum, data, tuple(range(data.ndim - 1))).squeeze()
-                # smooth data 
+                # smooth data
                 template = savgol_filter(template, 5, 1)
             else:
                 template_ar = psrchive.Archive_load(self.configs.template)
@@ -164,16 +177,40 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 if len(template_ar.get_frequencies()) > 1 and len(template_ar.get_frequencies()) < len(patient.get_frequencies()):
                     print("Template channel number doesn't match data... f-scrunching!")
                     template_ar.fscrunch()
-                
+
                 template_data = template_ar.get_data().squeeze()
                 print(f'Dimensions of input template: {template_data.shape}')
-                
+
+                if template_data.ndim > 2:
+                    # A proper template is (nchan, nbin) [2D] or (nbin,) [1D]
+                    # after squeeze(). Anything with more axes than that means
+                    # 'template' still has multiple sub-integrations in it --
+                    # i.e. it was never pol-/time-scrunched down to a single
+                    # representative profile, so axis 0 here is sub-integration,
+                    # not channel. Left unchecked, remove_profile_inplace()'s
+                    # 'template[ichan, :]' would silently slice the wrong axis
+                    # and eventually blow up deep inside fft_rotate() with an
+                    # opaque "operands could not be broadcast together" error.
+                    # Fail loudly here instead, with an actionable fix.
+                    raise ValueError(
+                        "Template '{0}' has shape {1} after squeezing -- "
+                        "expected 1D (nbin,) or 2D (nchan x nbin). This means "
+                        "the template still has {2} sub-integration(s) in it "
+                        "(axis 0 is sub-int, not channel), so it was never "
+                        "time-scrunched down to a single representative "
+                        "profile. Fix with, e.g.:\n"
+                        "    pam -Tp -e T2d {0}\n"
+                        "and point -T at the resulting scrunched file instead."
+                        .format(self.configs.template, template_data.shape,
+                                template_data.shape[0])
+                    )
+
                 # 1D profile for phase-offset fit and on-pulse masking
                 template_phs = np.apply_over_axes(np.sum, template_data,
                                                   tuple(range(template_data.ndim - 1))).squeeze()
                 # keep frequency resolution for the per-channel subtraction
                 template = template_data if template_data.ndim > 1 else template_phs
-                
+
 
             print('Estimating template and profile phase offset')
             if self.configs.template is None:
@@ -200,7 +237,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             if plot:
                 preop_patient = patient.clone()
             clean_utils.remove_profile_inplace(patient, template, phs)
-        
+
             print('Accessing weights and applying to patient')
             # re-set DM to 0
             # patient.dededisperse()
@@ -215,14 +252,14 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 preop_data = preop_patient.get_data()[:,0,:,:]
                 preop_patient = []  # clear for the sake of memory
                 preop_data = clean_utils.apply_weights(preop_data, weights)
-            
+
             # Mask profiles where weight is 0
             mask_2d = np.bitwise_not(np.expand_dims(weights, 2).astype(bool))
             mask_3d = mask_2d.repeat(ar.get_nbin(), axis=2)
             data = np.ma.masked_array(data, mask=mask_3d)
             if plot:
-                preop_data = np.ma.masked_array(preop_data, mask=mask_3d)        
-    
+                preop_data = np.ma.masked_array(preop_data, mask=mask_3d)
+
             print('Masking on-pulse region as determined from template')
             # consider residual only in off-pulse region
             if len(np.shape(template)) > 1:  # sum over frequencies
@@ -248,7 +285,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 # plt.plot(params[0]*masked_template + params[1], 'k')
                 plt.plot(params[0]*template_rot, alpha=0.5)
                 plt.plot(params[0]*masked_template, 'k')
-                plt.legend(('Pre-op data', 'Scaled and rotated template', 'Masked template'))            
+                plt.legend(('Pre-op data', 'Scaled and rotated template', 'Masked template'))
             # Loop through chans and subints to mask on-pulse phase bins
             for ii in range(0, np.shape(data)[0]):
                 for jj in range(0, np.shape(data)[1]):
@@ -267,7 +304,7 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
             print('Calculating robust statistics to determine where RFI removal is required')
             # RFI-ectomy must be recommended by average of tests, or a single test if aggressive option is used.
             # DJR: The stats are mean, peak-to-peak, standard deviation, and max value of FFT
-            
+
             avg_test_results = clean_utils.comprehensive_stats(data, axis=2, \
                                         chanthresh=self.configs.chanthresh, \
                                         subintthresh=self.configs.subintthresh, \
