@@ -3,29 +3,6 @@ Useful utility functions for cleaning a PSRCHIVE archive.
 
 Patrick Lazarus, Feb. 14, 2012
 
---- PATCH NOTE (local modification, not upstream) ---
-remove_profile1d()'s initial amplitude guess used to be
-np.median(prof)/np.median(template). That's fine when 'template' is a
-single profile summed over many frequency channels (the old behavior),
-but once a genuine per-channel 2D template is fit channel-by-channel (as
-on the 2D_tools branch), each channel's own narrow on-pulse region is a
-small fraction of nbin, so np.median(template) is exactly 0 for nearly
-every channel -- a real, mostly-zero-but-not-degenerate template, not a
-broken one. That produced a silent RuntimeWarning (divide by zero ->
-inf initial guess -> inf*0 = nan written into the archive), which later
-crashed comprehensive_stats()'s polynomial detrending with
-"array must not contain infs or NaNs".
-
-Fixed by:
-  1. Using the closed-form least-squares solution
-     amp = dot(template, prof) / dot(template, template)
-     as the initial guess instead of a median ratio -- this is the exact
-     analytic minimizer for the linear model amp*template ~= prof, and
-     it's well-behaved for sparse/narrow templates.
-  2. Explicitly guarding against a genuinely all-zero template (e.g. a
-     blanked/RFI-zapped/out-of-band channel) by skipping the fit and
-     zero-weighting that profile, the same way a failed fit already is
-     handled -- instead of computing 0/0.
 ------------------------------------------------------
 """
 import warnings
