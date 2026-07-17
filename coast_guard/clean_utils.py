@@ -438,7 +438,6 @@ def fft_rotate(data, bins):
     # original length (irfft otherwise assumes an even-length signal).
     return np.fft.irfft(phasor*np.fft.rfft(data), n=data.size)
 
-
 def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
     """Fit and subtract a (rotated, scaled) template from a single profile.
 
@@ -499,6 +498,7 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
             return (isub, ichan), err(params), params
         else:
             return (isub, ichan), err(params)
+
 
 def remove_profile(data, nsubs, nchans, template, nthreads=None):
     """Remove a template profile from every sub-int/channel of 'data'.
