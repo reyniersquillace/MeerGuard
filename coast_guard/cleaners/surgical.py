@@ -4,18 +4,6 @@ The 'surgical' cleaner (surgical scrub).
 De-weights individual profiles (sub-int/channel cells) whose off-pulse
 residuals stand out relative to others in the same channel or sub-int,
 after removing a (optionally supplied) template profile.
-
---- PATCH NOTE (local modification, not upstream) ---
-Adds a shape check right after the template is loaded: if the squeezed
-template array still has more than 2 dimensions, it means the template
-file was never time-scrunched down to a single representative profile
-(its axis 0 is still sub-integration, not channel). Previously this fell
-through silently and 'template[ichan, :]' downstream in
-clean_utils.remove_profile_inplace() sliced the wrong axis, eventually
-crashing deep inside fft_rotate() with a cryptic
-"operands could not be broadcast together" shape-mismatch error. Now it
-fails immediately with a message that says what's actually wrong and how
-to fix it (pam -Tp).
 ------------------------------------------------------
 """
 import numpy as np
