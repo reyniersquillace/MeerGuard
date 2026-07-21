@@ -170,33 +170,17 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 print(f'Dimensions of input template: {template_data.shape}')
 
                 if template_data.ndim > 2:
-                    # A proper template is (nchan, nbin) [2D] or (nbin,) [1D]
-                    # after squeeze(). Anything with more axes than that means
-                    # 'template' still has multiple sub-integrations in it --
-                    # i.e. it was never pol-/time-scrunched down to a single
-                    # representative profile, so axis 0 here is sub-integration,
-                    # not channel. Left unchecked, remove_profile_inplace()'s
-                    # 'template[ichan, :]' would silently slice the wrong axis
-                    # and eventually blow up deep inside fft_rotate() with an
-                    # opaque "operands could not be broadcast together" error.
-                    # Fail loudly here instead, with an actionable fix.
+                    #throw error for incorrect template shape
                     raise ValueError(
-                        "Template '{0}' has shape {1} after squeezing -- "
-                        "expected 1D (nbin,) or 2D (nchan x nbin). This means "
-                        "the template still has {2} sub-integration(s) in it "
-                        "(axis 0 is sub-int, not channel), so it was never "
-                        "time-scrunched down to a single representative "
-                        "profile. Fix with, e.g.:\n"
-                        "    pam -Tp -e T2d {0}\n"
-                        "and point -T at the resulting scrunched file instead."
+                        "Template '{0}' has shape {1} after squeezing. "
+                        "expected 1D (nbin,) or 2D (nchan x nbin)."
+                        "Check that you've T-scrunched your template!!!"
                         .format(self.configs.template, template_data.shape,
                                 template_data.shape[0])
                     )
 
-                # 1D profile for phase-offset fit and on-pulse masking
                 template_phs = np.apply_over_axes(np.sum, template_data,
                                                   tuple(range(template_data.ndim - 1))).squeeze()
-                # keep frequency resolution for the per-channel subtraction
                 template = template_data if template_data.ndim > 1 else template_phs
 
 
@@ -212,8 +196,6 @@ class SurgicalScrubCleaner(cleaners.BaseCleaner):
                 #err = (lambda (amp, phs, base): amp*clean_utils.fft_rotate(template_phs, phs) + base - profile)
                 #err = lambda amp, phs: amp*clean_utils.fft_rotate(template_phs, phs) - profile
                 err = lambda x: x[0]*clean_utils.fft_rotate(template_phs, x[1]) - profile
-                print(f'Profile median: {np.median(profile)}')
-                print(f'Profile median: {np.median(template_phs)}')
                 amp_guess = np.median(profile)/np.median(template_phs)
                 phase_guess = -(np.argmax(profile) - np.argmax(template_phs))
                 #params, status = leastsq(err, [amp_guess, phase_guess, np.min(profile) - np.min(template_phs)])
