@@ -435,11 +435,7 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
                 None if the template was degenerate.
     """
     if not np.any(template):
-        # Degenerate (all-zero) template for this channel -- e.g. a
-        # blanked/RFI-zapped/out-of-band channel in a per-channel 2D
-        # template. There's nothing to fit against. Treat this the same
-        # as a failed fit (caller zero-weights it) instead of computing
-        # median(prof)/median(template) = x/0.
+        
         warnings.warn("All-zero template for (isub=%d, ichan=%d); no fit "
                             "possible, zero-weighting this profile."
                             % (isub, ichan), errors.CoastGuardWarning)
@@ -450,13 +446,7 @@ def remove_profile1d(prof, isub, ichan, template, phs, return_params=False):
 
     rotated_template = fft_rotate(template, phs)
 
-    # Closed-form least-squares amplitude for the linear model
-    # amp*rotated_template ~= prof, i.e. the analytic minimizer of
-    # ||amp*rotated_template - prof||^2. This replaces the old
-    # np.median(prof)/np.median(template) initial guess, which divides by
-    # zero whenever the template's on-pulse duty cycle is under 50% of the
-    # profile -- the normal case for a per-channel template whose off-pulse
-    # region has been zeroed, even though the template itself is fine.
+    #safer than median estimation method
     denom = np.dot(rotated_template, rotated_template)
     amp_guess = np.dot(rotated_template, prof) / denom
 
